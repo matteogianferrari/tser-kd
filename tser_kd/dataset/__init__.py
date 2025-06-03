@@ -5,7 +5,9 @@ Modules:
 """
 
 from .cutout import CutOut
+from .cifar10 import load_cifar10_data
 
 __all__ = [
     "CutOut",
+    "load_cifar10_data",
 ]
