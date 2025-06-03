@@ -31,7 +31,7 @@ def load_cifar10_data(auto_aug: bool = False, cutout: bool = False) -> tuple:
 
     # Adds AutoAugment if specified
     if auto_aug:
-        train_transform.append(AutoAugment(policy==AutoAugmentPolicy.CIFAR10))
+        train_transform.append(AutoAugment(policy=AutoAugmentPolicy.CIFAR10))
 
     # Transform image to tensor
     train_transform.append(transforms.ToTensor())
