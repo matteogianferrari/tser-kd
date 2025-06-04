@@ -13,7 +13,8 @@ def run_train(
         model: nn.Module,
         criterion: nn.Module,
         optimizer: optim,
-        device: torch.device
+        device: torch.device,
+        scaler: torch.amp.GradScaler
 ) -> tuple:
     """Trains the model for one epoch over the provided data loader and tracks loss and accuracy.
 
@@ -24,6 +25,7 @@ def run_train(
         criterion: The loss function used to compute training loss.
         optimizer: The optimizer used to update model parameters.
         device: The device on which training computations will be performed.
+        scaler:
 
     Returns:
         tuple: A 4-tuple containing:
@@ -61,18 +63,25 @@ def run_train(
             inputs = inputs.to(device)  # non-blocking=True should be tested for performance
             targets = targets.to(device)  # non-blocking=True should be tested for performance
 
-            # Resets the gradients
-            optimizer.zero_grad()   # Check set_to_none=True
+            # Resets the gradients (set_to_none speeds up the operation)
+            optimizer.zero_grad(set_to_none=True)
 
-            # Computes the model's predictions
-            logits = model(inputs)      # Check CUDA mixed precision
+            # CUDA mixed precision
+            with torch.amp.autocast(device_type=device):
+                # Computes the model's predictions
+                logits = model(inputs)
 
-            # Computes the loss value between predictions and targets
-            loss_val = criterion(logits, targets)
+                # Computes the loss value between predictions and targets
+                loss_val = criterion(logits, targets)
 
-            # Backprop and gradient update
-            loss_val.backward()
-            optimizer.step()
+            # Scales AMP loss and apply backprop
+            scaler.scale(loss_val).backward()
+
+            # optimizer.step() is called automatically
+            scaler.step(optimizer)
+
+            # Updates the scale for the next iteration
+            scaler.update()
 
             # Computes accuracy of the model over the batch
             acc1, = accuracy(predictions=logits, targets=targets, top_k=(1,))
