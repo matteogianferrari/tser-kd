@@ -85,9 +85,9 @@ def run_eval(data_loader: DataLoader, model: nn.Module, criterion: nn.Module, de
         # Starts the timer
         ref_time = time.time()
 
-        # Offload the inputs and targets to the desired device
-        inputs = inputs.to(device)      # non-blocking=True should be tested for performance
-        targets = targets.to(device)    # non-blocking=True should be tested for performance
+        # Offload the inputs and targets to the desired device with asynchronous operation
+        inputs = inputs.to(device, non_blocking=True)
+        targets = targets.to(device, non_blocking=True)
 
         # CUDA automatic mixed precision
         with torch.amp.autocast(device_type=device_type):

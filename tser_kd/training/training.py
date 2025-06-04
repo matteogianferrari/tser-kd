@@ -67,9 +67,9 @@ def run_train(
             # Starts the timer
             ref_time = time.time()
 
-            # Offload the inputs and targets to the desired device
-            inputs = inputs.to(device)  # non-blocking=True should be tested for performance
-            targets = targets.to(device)  # non-blocking=True should be tested for performance
+            # Offload the inputs and targets to the desired device with asynchronous operation
+            inputs = inputs.to(device, non_blocking=True)
+            targets = targets.to(device, non_blocking=True)
 
             # Resets the gradients (set_to_none speeds up the operation)
             optimizer.zero_grad(set_to_none=True)
