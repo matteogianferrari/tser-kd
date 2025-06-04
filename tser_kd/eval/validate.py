@@ -50,6 +50,8 @@ def accuracy(predictions: torch.Tensor, targets: torch.Tensor, top_k: tuple = (1
 def run_eval(data_loader: DataLoader, model: nn.Module, criterion: nn.Module, device: torch.device) -> tuple:
     """Evaluates the model on the given dataset and computes loss and accuracy metrics.
 
+    This function uses PyTorch AMP to perform model's predictions.
+
     Args:
         data_loader: A PyTorch DataLoader providing (inputs, targets) pairs.
         model: The neural network to evaluate.
@@ -63,6 +65,12 @@ def run_eval(data_loader: DataLoader, model: nn.Module, criterion: nn.Module, de
             - top5.avg: Average top‐5 accuracy (%) over the entire dataset.
             - batch_time.avg: Average elapsed time (in seconds) per batch during evaluation.
     """
+    # Device check
+    if device == 'cpu':
+        device_type = 'cpu'
+    else:
+        device_type = 'cuda'
+
     # Puts the model in evaluation mode
     model.eval()
 
@@ -81,11 +89,13 @@ def run_eval(data_loader: DataLoader, model: nn.Module, criterion: nn.Module, de
         inputs = inputs.to(device)      # non-blocking=True should be tested for performance
         targets = targets.to(device)    # non-blocking=True should be tested for performance
 
-        # Computes the model's predictions
-        logits = model(inputs)
+        # CUDA automatic mixed precision
+        with torch.amp.autocast(device_type=device_type):
+            # Computes the model's predictions
+            logits = model(inputs)
 
-        # Computes the loss value between predictions and targets
-        loss_val = criterion(logits, targets)
+            # Computes the loss value between predictions and targets
+            loss_val = criterion(logits, targets)
 
         # Computes the accuracy of the model
         acc1, acc5 = accuracy(predictions=logits, targets=targets, top_k=(1, 5))

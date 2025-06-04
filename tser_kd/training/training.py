@@ -18,6 +18,8 @@ def run_train(
 ) -> tuple:
     """Trains the model for one epoch over the provided data loader and tracks loss and accuracy.
 
+    This function uses PyTorch AMP to perform model's predictions.
+
     Args:
         epoch: Zero‐based index of the current training epoch.
         data_loader: PyTorch DataLoader providing batches for training.
@@ -25,7 +27,7 @@ def run_train(
         criterion: The loss function used to compute training loss.
         optimizer: The optimizer used to update model parameters.
         device: The device on which training computations will be performed.
-        scaler:
+        scaler: The scaler used with PyTorch AMP.
 
     Returns:
         tuple: A 4-tuple containing:
@@ -34,6 +36,12 @@ def run_train(
             - epoch_time: Total elapsed wall‐clock time (in seconds) to complete this epoch.
             - batch_time.avg: Average time (in seconds) to process one batch during this epoch.
     """
+    # Device check
+    if device == 'cpu':
+        device_type = 'cpu'
+    else:
+        device_type = 'cuda'
+
     # Puts the model in training mode
     model.train()
 
@@ -66,8 +74,8 @@ def run_train(
             # Resets the gradients (set_to_none speeds up the operation)
             optimizer.zero_grad(set_to_none=True)
 
-            # CUDA mixed precision
-            with torch.amp.autocast(device_type=device):
+            # CUDA automatic mixed precision
+            with torch.amp.autocast(device_type=device_type):
                 # Computes the model's predictions
                 logits = model(inputs)
 
