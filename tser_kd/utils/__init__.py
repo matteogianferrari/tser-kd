@@ -1,7 +1,7 @@
-"""Training Package.
+"""Utils Package.
 
 Modules:
-    util:
+    util: Defines functions used during the experiments.
 """
 
 from .util import setup_seed
