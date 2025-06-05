@@ -2,13 +2,14 @@
 
 Modules:
     early_stopping: Defines the EarlyStopping class used to terminate training when validation loss stops improving.
-    training: Defines run_train function used to train the model for one epoch.
+    training: Defines run_train function used to train the models.
 """
 
 from .early_stopping import EarlyStopping
-from .training import run_train
+from .training import *
 
 __all__ = [
     "EarlyStopping",
     "run_train",
+    "forward_pass",
 ]

@@ -3,8 +3,54 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from snntorch import utils
 from tqdm import tqdm
 from tser_kd.eval import MetricMeter, accuracy
+
+
+def forward_pass(snn_model: nn.Module, input_spikes: torch.Tensor) -> tuple:
+    """Performs a time‐stepped forward pass through a SNN model.
+
+    This function resets all hidden LIF neuron states in the 'snn_model' before iterating
+    over 'num_steps' time steps. At each time step, it feeds the corresponding slice of
+    'input_spikes' into the model, obtains the output spike tensor and membrane potential
+    tensor, and appends them to recording lists.
+
+    Args:
+        snn_model: A spiking neural network model.
+        input_spikes: A tensor of shape [T, B, C, H, W] containing the input spikes for each time step.
+
+    Returns:
+        tuple: A 2‐tuple containing:
+            - spk_rec: A tensor of shape [T, K] where each slice is the output spikes from the model.
+            - mem_rec: A tensor of shape [T, K] where each slice  is the membrane potential from the model.
+    """
+    # Membranes potentials through time
+    mem_rec = []
+
+    # Neurons spikes through time
+    spk_rec = []
+
+    # Resets the hidden states for all LIF neurons in the network
+    utils.reset(snn_model)
+
+    # Retrieves the time steps
+    T = input_spikes.shape(0)
+
+    # Iterates through time steps
+    for t in range(T):  # Check LIF parallel to avoid loop
+        # Model's predictions
+        spk_out, mem_out = snn_model(input_spikes[t])
+
+        # Records spikes and membrane potentials for time step t
+        spk_rec.append(spk_out)
+        mem_rec.append(mem_out)
+
+    # Converts the lists into tensors
+    spk_rec = torch.stack(spk_rec)
+    mem_rec = torch.stack(mem_rec)
+
+    return spk_rec, mem_rec
 
 
 def run_train(
@@ -106,7 +152,6 @@ def run_train(
             pbar.set_postfix(
                 loss=f"{loss.avg:.4f}",
                 acc=f"{top1.avg:.2f}%",
-                batch_time=f"{batch_time.avg:.2f}s",
                 refresh=False
             )
             pbar.update(1)
