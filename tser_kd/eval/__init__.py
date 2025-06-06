@@ -6,10 +6,11 @@ Modules:
 """
 
 from .metric_meter import MetricMeter
-from .validate import accuracy, run_eval
+from .validate import *
 
 __all__ = [
     "MetricMeter",
     "accuracy",
+    "accuracy_spikes",
     "run_eval",
 ]
