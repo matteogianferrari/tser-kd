@@ -5,7 +5,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from snntorch import utils
 from tqdm import tqdm
-from tser_kd.eval import MetricMeter, accuracy
+from tser_kd.eval import MetricMeter, accuracy, accuracy_spikes
+from tser_kd.dataset import Encoder
 
 
 def forward_pass(snn_model: nn.Module, input_spikes: torch.Tensor) -> tuple:
@@ -35,7 +36,7 @@ def forward_pass(snn_model: nn.Module, input_spikes: torch.Tensor) -> tuple:
     utils.reset(snn_model)
 
     # Retrieves the time steps
-    T = input_spikes.shape(0)
+    T = input_spikes.size(0)
 
     # Iterates through time steps
     for t in range(T):  # Check LIF parallel to avoid loop
@@ -60,7 +61,8 @@ def run_train(
         criterion: nn.Module,
         optimizer: optim,
         device: torch.device,
-        scaler: torch.amp.GradScaler
+        scaler: torch.amp.GradScaler,
+        encoder: Encoder = None
 ) -> tuple:
     """Trains the model for one epoch over the provided data loader and tracks loss and accuracy.
 
@@ -74,6 +76,7 @@ def run_train(
         optimizer: The optimizer used to update model parameters.
         device: The device on which training computations will be performed.
         scaler: The scaler used with PyTorch AMP.
+        encoder: The encoder used to encode inputs into spikes over a temporal dimensions.
 
     Returns:
         tuple: A 4-tuple containing:
@@ -122,11 +125,24 @@ def run_train(
 
             # CUDA automatic mixed precision
             with torch.amp.autocast(device_type=device_type):
-                # Computes the model's predictions
-                logits = model(inputs)
+                # Checks if the model is an ANN or a SNN
+                if encoder is not None:
+                    # SNN
+                    # Encodes the batch of data
+                    input_spikes = encoder(inputs)
 
-                # Computes the loss value between predictions and targets
-                loss_val = criterion(logits, targets)
+                    # Registers the output spikes over the T time steps in the forward pass
+                    spikes, _ = forward_pass(snn_model=model, input_spikes=input_spikes)
+
+                    # Computes the loss value between spikes and targets
+                    loss_val = criterion(spikes, targets)
+                else:
+                    # ANN
+                    # Computes the model's predictions
+                    logits = model(inputs)
+
+                    # Computes the loss value between predictions and targets
+                    loss_val = criterion(logits, targets)
 
             # Scales AMP loss and apply backprop
             scaler.scale(loss_val).backward()
@@ -137,8 +153,15 @@ def run_train(
             # Updates the scale for the next iteration
             scaler.update()
 
-            # Computes accuracy of the model over the batch
-            acc1, = accuracy(predictions=logits, targets=targets, top_k=(1,))
+            # Checks if the model is an ANN or a SNN
+            if encoder is not None:
+                # SNN
+                # Computes the accuracy of the model using 'accuracy_rate'
+                acc1, = accuracy_spikes(spk_rec=spikes, targets=targets, top_k=(1,))
+            else:
+                # ANN
+                # Computes accuracy of the model over the batch
+                acc1, = accuracy(predictions=logits, targets=targets, top_k=(1,))
 
             # Retrieves the batch-size
             B = targets.size(0)
