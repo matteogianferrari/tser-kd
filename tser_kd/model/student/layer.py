@@ -176,7 +176,7 @@ class TWrapLayer(nn.Module):
         """
 
         Args:
-            x: Input tensor of shape [B, C, H, W, T].
+            x: Input tensor of shape [T, B, C, H, W].
 
         Returns:
 
@@ -186,11 +186,11 @@ class TWrapLayer(nn.Module):
         x_out = []
 
         # Retrieves the number of time steps
-        T = x.size(4)
+        T = x.size(0)
 
         for t in range(T):
             # [B, C, H, W]
-            x_out.append(self.layer(x[..., t]))
+            x_out.append(self.layer(x[t]))
 
         x_out = torch.stack(x_out)
 
