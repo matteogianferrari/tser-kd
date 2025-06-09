@@ -4,7 +4,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from snntorch import functional as SF
 from snntorch import utils
-from tser_kd.eval import MetricMeter
+from tser_kd.utils import MetricMeter
 
 
 @torch.no_grad()
