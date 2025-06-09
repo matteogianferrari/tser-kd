@@ -5,64 +5,20 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from snntorch import utils
 from tqdm import tqdm
-from tser_kd.eval import MetricMeter, accuracy, accuracy_spikes
+from tser_kd.eval import accuracy
+from tser_kd.utils import MetricMeter
 from tser_kd.dataset import Encoder
 
 
-def forward_pass(snn_model: nn.Module, input_spikes: torch.Tensor) -> tuple:
-    """Performs a time‐stepped forward pass through a SNN model.
-
-    This function resets all hidden LIF neuron states in the 'snn_model' before iterating
-    over 'num_steps' time steps. At each time step, it feeds the corresponding slice of
-    'input_spikes' into the model, obtains the output spike tensor and membrane potential
-    tensor, and appends them to recording lists.
-
-    Args:
-        snn_model: A spiking neural network model.
-        input_spikes: A tensor of shape [T, B, C, H, W] containing the input spikes for each time step.
-
-    Returns:
-        tuple: A 2‐tuple containing:
-            - spk_rec: A tensor of shape [T, K] where each slice is the output spikes from the model.
-            - mem_rec: A tensor of shape [T, K] where each slice  is the membrane potential from the model.
-    """
-    # Membranes potentials through time
-    mem_rec = []
-
-    # Neurons spikes through time
-    spk_rec = []
-
-    # Resets the hidden states for all LIF neurons in the network
-    utils.reset(snn_model)
-
-    # Retrieves the time steps
-    T = input_spikes.size(0)
-
-    # Iterates through time steps
-    for t in range(T):  # Check LIF parallel to avoid loop
-        # Model's predictions
-        spk_out, mem_out = snn_model(input_spikes[t])
-
-        # Records spikes and membrane potentials for time step t
-        spk_rec.append(spk_out)
-        mem_rec.append(mem_out)
-
-    # Converts the lists into tensors
-    spk_rec = torch.stack(spk_rec)
-    mem_rec = torch.stack(mem_rec)
-
-    return spk_rec, mem_rec
-
-
 def run_train(
-        epoch: int,
-        data_loader: DataLoader,
-        model: nn.Module,
-        criterion: nn.Module,
-        optimizer: optim,
-        device: torch.device,
-        scaler: torch.amp.GradScaler,
-        encoder: Encoder = None
+    epoch: int,
+    data_loader: DataLoader,
+    model: nn.Module,
+    criterion: nn.Module,
+    optimizer: optim,
+    device: torch.device,
+    scaler: torch.amp.GradScaler,
+    encoder: Encoder = None
 ) -> tuple:
     """Trains the model for one epoch over the provided data loader and tracks loss and accuracy.
 
@@ -76,7 +32,7 @@ def run_train(
         optimizer: The optimizer used to update model parameters.
         device: The device on which training computations will be performed.
         scaler: The scaler used with PyTorch AMP.
-        encoder: The encoder used to encode inputs into spikes over a temporal dimensions.
+        encoder: Encoder used to convert images into spike trains.
 
     Returns:
         tuple: A 4-tuple containing:
@@ -128,14 +84,18 @@ def run_train(
                 # Checks if the model is an ANN or a SNN
                 if encoder is not None:
                     # SNN
-                    # Encodes the batch of data
-                    input_spikes = encoder(inputs)
+                    # Encodes the data with the specified encoder type
+                    inputs = encoder(inputs)
+                    # [T, B, C, H, W]
 
-                    # Registers the output spikes over the T time steps in the forward pass
-                    spikes, _ = forward_pass(snn_model=model, input_spikes=input_spikes)
+                    # Resets LIF neurons' hidden states
+                    utils.reset(model)
 
-                    # Computes the loss value between spikes and targets
-                    loss_val = criterion(spikes, targets)
+                    # Computes the model's predictions
+                    logits = model(inputs)
+
+                    # Computes the loss value between predictions and targets
+                    loss_val = criterion(logits, targets)
                 else:
                     # ANN
                     # Computes the model's predictions
@@ -156,8 +116,8 @@ def run_train(
             # Checks if the model is an ANN or a SNN
             if encoder is not None:
                 # SNN
-                # Computes the accuracy of the model using 'accuracy_rate'
-                acc1, = accuracy_spikes(spk_rec=spikes, targets=targets, top_k=(1,))
+                # Computes the accuracy of the model [B, C, H, W]
+                acc1, = accuracy(predictions=logits.mean(0), targets=targets, top_k=(1,))
             else:
                 # ANN
                 # Computes accuracy of the model over the batch

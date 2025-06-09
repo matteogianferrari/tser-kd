@@ -5,6 +5,7 @@ Sub-Packages:
 """
 
 from .teacher import *
+from .student import *
 
 __all__ = [
 ]

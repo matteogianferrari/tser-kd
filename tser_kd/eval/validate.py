@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 from snntorch import functional as SF
 from snntorch import utils
 from tser_kd.utils import MetricMeter
+from tser_kd.dataset import Encoder
 
 
 @torch.no_grad()
@@ -69,11 +70,11 @@ def accuracy_snn(spikes: torch.Tensor,  targets: torch.Tensor, top_k: tuple = (1
 
 @torch.no_grad()
 def run_eval(
-        data_loader: DataLoader,
-        model: nn.Module,
-        criterion: nn.Module,
-        device: torch.device,
-        net_type: str
+    data_loader: DataLoader,
+    model: nn.Module,
+    criterion: nn.Module,
+    device: torch.device,
+    encoder: Encoder = None
 ) -> tuple:
     """Evaluates the model on the given dataset and computes loss and accuracy metrics.
 
@@ -84,7 +85,7 @@ def run_eval(
         model: The neural network to evaluate.
         criterion: Loss function used to compute the validation loss.
         device: Device on which to perform computation.
-        net_type: Type of neural network to evaluate.
+        encoder: Encoder used to convert images into spike trains.
 
     Returns:
         tuple: A 4-tuple containing:
@@ -120,16 +121,19 @@ def run_eval(
         # CUDA automatic mixed precision
         with torch.amp.autocast(device_type=device_type):
             # Checks if the model is an ANN or a SNN
-            if net_type == 'snn':
+            if encoder is not None:
                 # SNN
+                # Encodes the data with the specified encoder type
+                inputs = encoder(inputs)
+                # [T, B, C, H, W]
+
                 # Resets LIF neurons' hidden states
                 utils.reset(model)
 
                 # Computes the model's predictions
                 logits = model(inputs)
 
-                # Reshape logits from [B, K, T] to [T, B, K]
-                logits = logits.permute(2, 0, 1)
+                # [T, B, K]
 
                 # Computes the loss value between predictions and targets
                 loss_val = criterion(logits, targets)
@@ -142,9 +146,9 @@ def run_eval(
                 loss_val = criterion(logits, targets)
 
         # Checks if the model is an ANN or a SNN
-        if net_type == 'snn':
+        if encoder is not None:
             # SNN
-            # Computes the accuracy of the model
+            # Computes the accuracy of the model [B, C, H, W]
             acc1, acc5 = accuracy(predictions=logits.mean(0), targets=targets, top_k=(1, 5))
         else:
             # ANN

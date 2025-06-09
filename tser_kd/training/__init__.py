@@ -6,10 +6,9 @@ Modules:
 """
 
 from .early_stopping import EarlyStopping
-from .training import *
+from .training import run_train
 
 __all__ = [
     "EarlyStopping",
     "run_train",
-    "forward_pass",
 ]

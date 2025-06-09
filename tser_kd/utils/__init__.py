@@ -3,7 +3,7 @@
 Modules:
     util: Defines functions used during the experiments.
     metric_meter: Defines the 'MetricMeter' class used to tracks a streaming metric using observed values.
-    spikes: 
+    spikes:
 """
 
 from .util import setup_seed
