@@ -17,7 +17,6 @@ def plot_spike_train_over_channels(spike_train: torch.Tensor, cmaps: str | List[
         cmaps: A matplotlib colormap name applied to all channels, or a sequence of length C specifying
             a colormap for each channel.
     """
-    # Input tensor of shape [T, C, H, W]
     # Retrieves the number of channels
     C = spike_train.size(1)
 
@@ -32,8 +31,11 @@ def plot_spike_train_over_channels(spike_train: torch.Tensor, cmaps: str | List[
         fig, ax = plt.subplots()
         ax.set_title(f"Channel {c}")
 
+        # Retrieves the slice of data, data.shape: [T, H, W]
+        data = spike_train[:, c]
+
         # Animates and displays the plot
-        anim = splt.animator(data=spike_train[:, c], fig=fig, ax=ax, cmap=cmap)
+        anim = splt.animator(data=data, fig=fig, ax=ax, cmap=cmap)
         display(HTML(anim.to_html5_video()))
 
         plt.close(fig)
@@ -47,9 +49,8 @@ def plot_raster_over_channels(spike_train: torch.Tensor) -> None:
 
     Args:
         spike_train: Tensor of shape [T, C, H, W] containing spike indicators.
-
     """
-    # Input tensor of shape [T, C, H, W]
+    # Retrieves the shape of the input spike train
     T, C, H, W = spike_train.shape
 
     # Creates a single figure with 3 subplots
@@ -59,14 +60,14 @@ def plot_raster_over_channels(spike_train: torch.Tensor) -> None:
         # Select the subplot
         ax = axes[ch]
 
-        # Selects the channel and collapses the spatial dimension into a shape [T, N]
+        # Selects the channel and collapses the spatial dimension, data.shape: [T, N]
         data = spike_train[:, ch].reshape(T, -1)
         x_label = "Time steps"
         y_label = "Features"
 
         # Checks if the time steps are greater than the number of features
         if T < data.size(1):
-            # Reshape the tensor to [N, T]
+            # Reshape the tensor, data.shape: [N, T]
             data = data.T
             x_label = "Features"
             y_label = "Time steps"

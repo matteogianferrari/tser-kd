@@ -143,8 +143,9 @@ def run_eval(
 
         # Offload the inputs and targets to the desired device with asynchronous operation
         # inputs.shape: [B, C, H, W]
-        # targets.shape: [B]
         inputs = inputs.to(device, non_blocking=True)
+
+        # targets.shape: [B]
         targets = targets.to(device, non_blocking=True)
 
         # CUDA automatic mixed precision
@@ -158,17 +159,17 @@ def run_eval(
                 # Resets LIF neurons' hidden states
                 utils.reset(model)
 
-                # Computes the model's predictions, logits.shape: [T, B, K]
+                # Computes the model's logits, logits.shape: [T, B, K]
                 logits = model(inputs)
 
-                # Computes the loss value between predictions and targets
+                # Computes the loss value between logits and targets
                 loss_val = criterion(logits, targets)
             else:
                 # ANN
-                # Computes the model's predictions, logits.shape: [B, K]
+                # Computes the model's logits, logits.shape: [B, K]
                 logits = model(inputs)
 
-                # Computes the loss value between predictions and targets
+                # Computes the loss value between logits and targets
                 loss_val = criterion(logits, targets)
 
         # Checks if the model is an ANN or a SNN

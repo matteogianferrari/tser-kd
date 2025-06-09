@@ -5,7 +5,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from snntorch import utils
 from tqdm import tqdm
-from tser_kd.eval import accuracy
+from tser_kd.eval import accuracy, accuracy_snn
 from tser_kd.utils import MetricMeter
 from tser_kd.dataset import Encoder
 
@@ -73,7 +73,10 @@ def run_train(
             ref_time = time.time()
 
             # Offload the inputs and targets to the desired device with asynchronous operation
+            # inputs.shape: [B, C, H, W]
             inputs = inputs.to(device, non_blocking=True)
+
+            # targets.shape: [B]
             targets = targets.to(device, non_blocking=True)
 
             # Resets the gradients (set_to_none speeds up the operation)
@@ -84,24 +87,23 @@ def run_train(
                 # Checks if the model is an ANN or a SNN
                 if encoder is not None:
                     # SNN
-                    # Encodes the data with the specified encoder type
+                    # Encodes the data with the specified encoder type, inputs.shape: [T, B, C, H, W]
                     inputs = encoder(inputs)
-                    # [T, B, C, H, W]
 
                     # Resets LIF neurons' hidden states
                     utils.reset(model)
 
-                    # Computes the model's predictions
+                    # Computes the model's logits, logits.shape: [T, B, K]
                     logits = model(inputs)
 
-                    # Computes the loss value between predictions and targets
+                    # Computes the loss value between logits and targets
                     loss_val = criterion(logits, targets)
                 else:
                     # ANN
-                    # Computes the model's predictions
+                    # Computes the model's logits, logits.shape: [B, K]
                     logits = model(inputs)
 
-                    # Computes the loss value between predictions and targets
+                    # Computes the loss value between logits and targets
                     loss_val = criterion(logits, targets)
 
             # Scales AMP loss and apply backprop
@@ -116,8 +118,8 @@ def run_train(
             # Checks if the model is an ANN or a SNN
             if encoder is not None:
                 # SNN
-                # Computes the accuracy of the model [B, C, H, W]
-                acc1, = accuracy(predictions=logits, targets=targets, top_k=(1,))
+                # Computes the accuracy of the model
+                acc1, = accuracy_snn(logits=logits, targets=targets, top_k=(1,))
             else:
                 # ANN
                 # Computes accuracy of the model over the batch
