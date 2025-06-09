@@ -149,7 +149,7 @@ def run_eval(
         if encoder is not None:
             # SNN
             # Computes the accuracy of the model [B, C, H, W]
-            acc1, acc5 = accuracy(predictions=logits.mean(0), targets=targets, top_k=(1, 5))
+            acc1, acc5 = accuracy(predictions=logits, targets=targets, top_k=(1, 5))
         else:
             # ANN
             # Computes the accuracy of the model

@@ -117,7 +117,7 @@ def run_train(
             if encoder is not None:
                 # SNN
                 # Computes the accuracy of the model [B, C, H, W]
-                acc1, = accuracy(predictions=logits.mean(0), targets=targets, top_k=(1,))
+                acc1, = accuracy(predictions=logits, targets=targets, top_k=(1,))
             else:
                 # ANN
                 # Computes accuracy of the model over the batch
