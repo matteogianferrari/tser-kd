@@ -96,4 +96,3 @@ class RateEncoder(Encoder):
             torch.Tensor: A tensor of shape [T, B, C, H, W] containing binary spike (0 or 1) at each time step.
         """
         return spikegen.rate(data=x, num_steps=self.num_steps, gain=self.gain)
-

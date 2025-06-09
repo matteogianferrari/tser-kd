@@ -16,7 +16,7 @@ def accuracy(logits: torch.Tensor, targets: torch.Tensor, top_k: tuple = (1,)) -
     classes for each input in the batch. It supports computing multiple k values at once.
 
     Args:
-        logits: Logits of shape [B, K].
+        logits: Logits tensor of shape [B, K].
         targets: Ground‐truth class indices of shape [B].
         top_k: A tuple of k values for which to compute accuracy.
 
@@ -58,7 +58,7 @@ def accuracy_snn(logits: torch.Tensor,  targets: torch.Tensor, top_k: tuple = (1
     Each top-k accuracy is computed by averaging over the batch B, then by averaging between time steps T.
 
     Args:
-        logits: Logits output from network [T, B, K].
+        logits: Logits output from network of shape [T, B, K].
         targets: Ground‐truth class indices of shape [B].
         top_k: A tuple of k values for which to compute accuracy.
 
@@ -142,6 +142,8 @@ def run_eval(
         ref_time = time.time()
 
         # Offload the inputs and targets to the desired device with asynchronous operation
+        # inputs.shape: [B, C, H, W]
+        # targets.shape: [B]
         inputs = inputs.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
 
@@ -150,23 +152,20 @@ def run_eval(
             # Checks if the model is an ANN or a SNN
             if encoder is not None:
                 # SNN
-                # Encodes the data with the specified encoder type
+                # Encodes the data with the specified encoder type, inputs.shape: [T, B, C, H, W]
                 inputs = encoder(inputs)
-                # [T, B, C, H, W]
 
                 # Resets LIF neurons' hidden states
                 utils.reset(model)
 
-                # Computes the model's predictions
+                # Computes the model's predictions, logits.shape: [T, B, K]
                 logits = model(inputs)
-
-                # [T, B, K]
 
                 # Computes the loss value between predictions and targets
                 loss_val = criterion(logits, targets)
             else:
                 # ANN
-                # Computes the model's predictions
+                # Computes the model's predictions, logits.shape: [B, K]
                 logits = model(inputs)
 
                 # Computes the loss value between predictions and targets
@@ -175,7 +174,7 @@ def run_eval(
         # Checks if the model is an ANN or a SNN
         if encoder is not None:
             # SNN
-            # Computes the accuracy of the model [T, B, K]
+            # Computes the accuracy of the model
             acc1, acc5 = accuracy_snn(logits=logits, targets=targets, top_k=(1, 5))
         else:
             # ANN
