@@ -196,29 +196,41 @@ class LayerTWrapper(nn.Module):  # MODIFY FORWARD PASS WITH A VECTORIZED APPROAC
         Returns:
             torch.Tensor: Output tensor of shape [T, B, C, H, W] normalized along the temporal and spatial dimensions.
         """
-        # List of temporal outputs
-        x_out = []
+        # # List of temporal outputs
+        # x_out = []
+        #
+        # # Retrieves the number of time steps, x.shape: [T, B, C, H, W]
+        # T = x.size(0)
+        #
+        # # Forward pass in time
+        # for t in range(T):
+        #     # Retrieves the sample at time step t, x_t.shape: [B, C, H, W]
+        #     x_t = x[t]
+        #
+        #     # Appends the layer output
+        #     x_out.append(self.layer(x_t))
+        #
+        # # Converts the list into a tensor
+        # x_out = torch.stack(x_out)
+        # 
+        # # Applies batch normalization if present
+        # if self.batch_norm is not None:
+        #     # x_out.shape: [T, B, C, H, W]
+        #     x_out = self.batch_norm(x_out)
+        T, B, C, H, W = x.shape
 
-        # Retrieves the number of time steps, x.shape: [T, B, C, H, W]
-        T = x.size(0)
+        # 1) flatten time & batch into one mini-batch
+        x_flat = x.view(T * B, C, H, W)
 
-        # Forward pass in time
-        for t in range(T):
-            # Retrieves the sample at time step t, x_t.shape: [B, C, H, W]
-            x_t = x[t]
+        # 2) single call through the spatial layer
+        y_flat = self.layer(x_flat)
+        # y_flat: [T*B, C_out, H_out, W_out]
 
-            # Appends the layer output
-            x_out.append(self.layer(x_t))
+        # 3) reshape back to time‐aware tensor
+        C_out, H_out, W_out = y_flat.shape[1:]
+        y = y_flat.view(T, B, C_out, H_out, W_out)
 
-        # Converts the list into a tensor
-        x_out = torch.stack(x_out)
-
-        # Applies batch normalization if present
-        if self.batch_norm is not None:
-            # x_out.shape: [T, B, C, H, W]
-            x_out = self.batch_norm(x_out)
-
-        return x_out
+        return y
 
 
 class LeakyTWrapper(nn.Module):     # CHECK IF POSSIBLE TO USE RNN LEAKY

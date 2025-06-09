@@ -90,7 +90,7 @@ def accuracy_snn(logits: torch.Tensor,  targets: torch.Tensor, top_k: tuple = (1
         acc_per_t = correct_any.mean(dim=1)
 
         # Averages over all time steps
-        res.append(acc_per_t.mean())
+        res.append(acc_per_t.mean() * 100.0)
 
     return res
 
