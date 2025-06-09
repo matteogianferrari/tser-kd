@@ -113,7 +113,7 @@ class SResNet19(nn.Module):
         # Block 3
         self.block3 = self._make_block(num_blocks=2, out_channels=512, beta=beta)
 
-        self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.t_avg_pool = TWrapLayer(layer=nn.AdaptiveAvgPool2d((1, 1)))
 
         self.t_fc1 = TWrapLayer(layer=nn.Linear(in_features=512, out_features=256, bias=False))
         self.lif2 = snn.Leaky(beta=beta, init_hidden=True)
@@ -163,10 +163,10 @@ class SResNet19(nn.Module):
         x = self.block2(x)
         x = self.block3(x)
 
-        x = self.avg_pool(x)
-        x = x.view(x.shape[0], -1, x.shape[4])
+        x = self.t_avg_pool(x)
+        x = x.view(x.size(0), x.size(1), x.size(2))
 
         x = self.t_fc1(x)
         x = self.lif2(x)
 
-        return self.t_fc2(x)
+        return self.t_fc2(x).mean(0)
