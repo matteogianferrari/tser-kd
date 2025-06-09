@@ -212,23 +212,29 @@ class LayerTWrapper(nn.Module):  # MODIFY FORWARD PASS WITH A VECTORIZED APPROAC
         #
         # # Converts the list into a tensor
         # x_out = torch.stack(x_out)
-        # 
+        #
         # # Applies batch normalization if present
         # if self.batch_norm is not None:
         #     # x_out.shape: [T, B, C, H, W]
         #     x_out = self.batch_norm(x_out)
-        T, B, C, H, W = x.shape
+        # 1) time & batch dims
+        T, B = x.shape[0], x.shape[1]
+        # 2) the “rest” of dims (could be [C,H,W] or [N])
+        rest = x.shape[2:]
 
-        # 1) flatten time & batch into one mini-batch
-        x_flat = x.view(T * B, C, H, W)
+        # 3) collapse T,B → big batch
+        x_flat = x.reshape(T * B, *rest)
 
-        # 2) single call through the spatial layer
+        # 4) single call for either Conv2d, Linear, …
         y_flat = self.layer(x_flat)
-        # y_flat: [T*B, C_out, H_out, W_out]
 
-        # 3) reshape back to time‐aware tensor
-        C_out, H_out, W_out = y_flat.shape[1:]
-        y = y_flat.view(T, B, C_out, H_out, W_out)
+        # 5) un-collapse
+        out_rest = y_flat.shape[1:]
+        y = y_flat.reshape(T, B, *out_rest)
+
+        # 6) optional BN (must accept x of shape [T,B,…])
+        if self.batch_norm is not None:
+            y = self.batch_norm(y)
 
         return y
 
