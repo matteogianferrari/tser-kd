@@ -11,6 +11,6 @@ from .validate import *
 __all__ = [
     "MetricMeter",
     "accuracy",
-    "accuracy_spikes",
+    "accuracy_snn",
     "run_eval",
 ]
