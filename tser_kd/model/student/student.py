@@ -35,13 +35,13 @@ class SResNetBlock(nn.Module):
             layer=conv3x3(in_channels=in_channels, out_channels=out_channels, stride=stride),
             batch_norm=TDBatchNorm2d(num_features=out_channels)
         )
-        self.lif1 = snn.Leaky(beta=beta, init_hidden=True)
+        self.lif1 = TWrapLayer(layer=snn.Leaky(beta=beta, init_hidden=True))
 
         self.t_conv_bn2 = TWrapLayer(
             layer=conv3x3(in_channels=out_channels, out_channels=out_channels),
             batch_norm=TDBatchNorm2d(num_features=out_channels, alpha=1/(2**0.5))
         )
-        self.lif2 = snn.Leaky(beta=beta, init_hidden=True)
+        self.lif2 = TWrapLayer(layer=snn.Leaky(beta=beta, init_hidden=True))
 
         # Shortcut branch
         self.shortcuts = None
@@ -51,7 +51,7 @@ class SResNetBlock(nn.Module):
                 batch_norm=TDBatchNorm2d(num_features=out_channels, alpha=1/(2**0.5))
             )
 
-        self.lif3 = snn.Leaky(beta=beta, init_hidden=True)
+        self.lif3 = TWrapLayer(layer=snn.Leaky(beta=beta, init_hidden=True))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -102,7 +102,7 @@ class SResNet19(nn.Module):
             layer=conv3x3(in_channels=in_channels, out_channels=128),
             batch_norm=TDBatchNorm2d(num_features=128)
         )
-        self.lif1 = snn.Leaky(beta=beta, init_hidden=True)
+        self.lif1 = TWrapLayer(layer=snn.Leaky(beta=beta, init_hidden=True))
 
         # Block 1
         self.block1 = self._make_block(num_blocks=3, out_channels=128, beta=beta)
@@ -116,7 +116,7 @@ class SResNet19(nn.Module):
         self.t_avg_pool = TWrapLayer(layer=nn.AdaptiveAvgPool2d((1, 1)))
 
         self.t_fc1 = TWrapLayer(layer=nn.Linear(in_features=512, out_features=256, bias=False))
-        self.lif2 = snn.Leaky(beta=beta, init_hidden=True)
+        self.lif2 = TWrapLayer(layer=snn.Leaky(beta=beta, init_hidden=True))
 
         self.t_fc2 = TWrapLayer(layer=nn.Linear(in_features=256, out_features=num_classes, bias=False))
 
