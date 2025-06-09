@@ -6,6 +6,8 @@ Sub-Packages:
 
 from .teacher import *
 from .student import *
+from .loss import TSCELoss
 
 __all__ = [
+    "TSCELoss",
 ]
