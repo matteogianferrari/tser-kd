@@ -9,14 +9,14 @@ from tser_kd.dataset import Encoder
 
 
 @torch.no_grad()
-def accuracy(predictions: torch.Tensor, targets: torch.Tensor, top_k: tuple = (1,)) -> list[torch.Tensor]:
+def accuracy(logits: torch.Tensor, targets: torch.Tensor, top_k: tuple = (1,)) -> list[torch.Tensor]:
     """Computes the top‐k accuracy for the given logits and true labels.
 
     This function calculates the percentage of correct predictions within the top‐k highest scoring
     classes for each input in the batch. It supports computing multiple k values at once.
 
     Args:
-        predictions: Logits of shape [B, K].
+        logits: Logits of shape [B, K].
         targets: Ground‐truth class indices of shape [B].
         top_k: A tuple of k values for which to compute accuracy.
 
@@ -30,7 +30,7 @@ def accuracy(predictions: torch.Tensor, targets: torch.Tensor, top_k: tuple = (1
     B = targets.size(0)
 
     # Gets the indices of the 'max_k' scores for each sample
-    _, pred = predictions.topk(max_k, dim=1, largest=True, sorted=True)
+    _, pred = logits.topk(max_k, dim=1, largest=True, sorted=True)
 
     # Transposes the tensor
     pred = pred.T
@@ -50,22 +50,49 @@ def accuracy(predictions: torch.Tensor, targets: torch.Tensor, top_k: tuple = (1
 
 
 @torch.no_grad()
-def accuracy_snn(spikes: torch.Tensor,  targets: torch.Tensor, top_k: tuple = (1,)) -> list[torch.Tensor]:
-    """Computes the top‐k accuracy for the given spikes and true labels.
+def accuracy_snn(logits: torch.Tensor,  targets: torch.Tensor, top_k: tuple = (1,)) -> list[torch.Tensor]:
+    """Computes the top‐k accuracy for the given SNN logits and true labels.
 
     This function calculates the percentage of correct predictions within the top‐k highest scoring
     classes for each input in the batch. It supports computing multiple k values at once.
+    Each top-k accuracy is computed by averaging over the batch B, then by averaging between time steps T.
 
     Args:
-        spikes: Spike output from network [T, B, K].
+        logits: Logits output from network [T, B, K].
         targets: Ground‐truth class indices of shape [B].
         top_k: A tuple of k values for which to compute accuracy.
 
     Returns:
         list: A list of accuracy percentages corresponding to each k in `top_k`.
     """
-    # SF.accuracy_rate(predictions, targets) * 100.0)
-    return []
+    # Computes the maximum k
+    max_k = max(top_k)
+
+    # Gets the indices of the 'max_k' scores for each sample for each time step
+    _, pred = logits.topk(max_k, dim=2, largest=True, sorted=True)
+
+    # Retrieves the dimensions, pred.shape: [T, B, max_k]
+    T, B, _ = pred.shape
+
+    # Expands the target to match the predictions shape, targets.shape: [T, B]
+    targets = targets.unsqueeze(0).expand(T, B)
+
+    res = []
+    for k in top_k:
+        # Takes only the first k predictions, pred_k.shape: [T, B, k]
+        pred_k = pred[:, :, :k]
+
+        # Compares the predictions against the ground truth, correct_any.shape: [T, B]
+        correct_k = pred_k.eq(targets.unsqueeze(-1))
+        correct_any = correct_k.any(dim=2).float()
+
+        # Averages the accuracies over the batches, acc_per_t.shape: [T]
+        acc_per_t = correct_any.mean(dim=1)
+
+        # Averages over all time steps
+        res.append(acc_per_t.mean())
+
+    return res
 
 
 @torch.no_grad()
@@ -148,12 +175,12 @@ def run_eval(
         # Checks if the model is an ANN or a SNN
         if encoder is not None:
             # SNN
-            # Computes the accuracy of the model [B, C, H, W]
-            acc1, acc5 = accuracy(predictions=logits, targets=targets, top_k=(1, 5))
+            # Computes the accuracy of the model [T, B, K]
+            acc1, acc5 = accuracy_snn(logits=logits, targets=targets, top_k=(1, 5))
         else:
             # ANN
             # Computes the accuracy of the model
-            acc1, acc5 = accuracy(predictions=logits, targets=targets, top_k=(1, 5))
+            acc1, acc5 = accuracy(logits=logits, targets=targets, top_k=(1, 5))
 
         # Retrieves the batch-size
         B = targets.size(0)
