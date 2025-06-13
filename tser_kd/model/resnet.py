@@ -24,11 +24,11 @@ class ResNetBlock(nn.Module):
         super(ResNetBlock, self).__init__()
 
         # Main branch
-        self.t_conv1 = conv3x3(in_channels=in_channels, out_channels=out_channels, stride=stride)
+        self.conv1 = conv3x3(in_channels=in_channels, out_channels=out_channels, stride=stride)
         self.bn1 = nn.BatchNorm2d(num_features=out_channels)
         self.relu = nn.ReLU(inplace=True)
 
-        self.t_conv2 = conv3x3(in_channels=out_channels, out_channels=out_channels),
+        self.conv2 = conv3x3(in_channels=out_channels, out_channels=out_channels)
         self.bn2 = nn.BatchNorm2d(num_features=out_channels)
 
         # Shortcut branch
