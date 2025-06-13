@@ -4,8 +4,6 @@ Sub-Packages:
     teacher: Defines functions related to teacher models.
 """
 
-from .teacher import *
-from .student import *
 from .layer import conv3x3, conv1x1
 from .resnet import ResNetBlock, ResNet19
 from .loss import TSCELoss
