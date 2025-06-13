@@ -123,7 +123,7 @@ def run_train(
             else:
                 # ANN
                 # Computes accuracy of the model over the batch
-                acc1, = accuracy(predictions=logits, targets=targets, top_k=(1,))
+                acc1, = accuracy(logits=logits, targets=targets, top_k=(1,))
 
             # Retrieves the batch-size
             B = targets.size(0)
