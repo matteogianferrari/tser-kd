@@ -6,8 +6,14 @@ Sub-Packages:
 
 from .teacher import *
 from .student import *
+from .layer import conv3x3, conv1x1
+from .resnet import ResNetBlock, ResNet19
 from .loss import TSCELoss
 
 __all__ = [
+    "conv3x3",
+    "conv1x1",
+    "ResNetBlock",
+    "ResNet19",
     "TSCELoss",
 ]

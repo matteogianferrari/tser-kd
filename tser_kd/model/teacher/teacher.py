@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torchvision.models import resnet34, ResNet34_Weights
+from tser_kd.model import ResNet19
 
 
 def make_teacher_model(arch: str, in_channels: int, num_classes: int, device: torch.device, state_dict: dict = None) -> nn.Module:
@@ -11,8 +12,9 @@ def make_teacher_model(arch: str, in_channels: int, num_classes: int, device: to
     Optionally loads a pre-trained state dictionary into the model.
 
     Currently, supports:
-      - 'resnet-34': A ResNet-34 backbone pre-trained on ImageNet, with its first convolutional layer and final
-        fully connected layer modified for CIFAR-10.
+        - 'resnet-34': A ResNet-34 backbone pre-trained on ImageNet, with its first convolutional layer and final
+            fully connected layer modified for CIFAR-10.
+        - 'resnet-19': A custom ResNet-19 backbone for CIFAR-10.
 
     Args:
         arch: Architecture name.
@@ -44,9 +46,12 @@ def make_teacher_model(arch: str, in_channels: int, num_classes: int, device: to
 
         # Adapts the FC layer for classification
         teacher.fc = nn.Linear(in_features=teacher.fc.in_features, out_features=num_classes)
+    elif arch == 'resnet-19':
+        # Creates the teacher model custom architecture
+        teacher = ResNet19(in_channels=in_channels, num_classes=num_classes)
 
-        # Offloads the teacher model to the specified device
-        teacher = teacher.to(device)
+    # Offloads the teacher model to the specified device
+    teacher = teacher.to(device)
 
     # Checks if a parameter configuration must be loaded
     if state_dict is not None:
