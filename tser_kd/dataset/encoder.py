@@ -62,7 +62,7 @@ class StaticEncoder(Encoder):
         Returns:
             torch.Tensor: A 5D tensor with shape [T, B, C, H, W] representing the encoded input over time.
         """
-        return x.repeat(self.num_steps, 1, 1, 1, 1)
+        return x.unsqueeze(0).expand(self.num_steps, *x.shape)
 
 
 class RateEncoder(Encoder):
