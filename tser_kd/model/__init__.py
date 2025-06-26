@@ -6,7 +6,7 @@ Sub-Packages:
 
 from .layer import conv3x3, conv1x1
 from .resnet import ResNetBlock, ResNet19
-from .loss import TSCELoss
+from .loss import TSCELoss, TSKLLoss, EntropyReg, TSERKDLoss
 
 __all__ = [
     "conv3x3",
@@ -14,4 +14,7 @@ __all__ = [
     "ResNetBlock",
     "ResNet19",
     "TSCELoss",
+    "TSKLLoss",
+    "EntropyReg",
+    "TSERKDLoss",
 ]
