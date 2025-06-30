@@ -197,16 +197,6 @@ class EntropyReg(nn.Module):
 class TSERKDLoss(nn.Module):
     """Temporal Separation with Entropy Regularization for Knowledge Distillation (TSERKD) loss function.
 
-    The math equation that represents the TSKL loss function is:
-    $$
-    L_{KL} = \frac{1}{B}\sum_{i=1}^B{\frac{1}{T}\sum_{t=1}^T{KL(Q^{tea} || Q^{stu}(t))}}
-    $$
-    Where $Q^{stu}(t)$ is the probability vector at time $t$, computed by ($Q^{tea}$ is computed the same way):
-    $$
-    Q^{stu}(t) = \frac{exp(Z_i(t) / \tau)}{\sum_{j=1}^K{exp(Z_j(t) / \tau)}}
-    $$
-    Where $Z$ is the vector containing the student logits at time $t$ (same for the teacher but without the time).
-
     Attributes:
         tau: Hyperparameter that controls the temperature for the softmax.
         alpha: A float representing the weight to balance the 2 loss terms.
@@ -253,7 +243,7 @@ class TSERKDLoss(nn.Module):
                 - e_reg: A scalar tensor containing the entropy regularizer value.
         """
         # Computes the TSCE loss term
-        ce_loss = self.tsce_loss(s_logits=s_logits, targets=targets)
+        ce_loss = self.ce_loss(s_logits=s_logits, targets=targets)
 
         # Computes the TSKL loss term
         kl_loss = self.kl_loss(t_logits=t_logits, s_logits=s_logits)

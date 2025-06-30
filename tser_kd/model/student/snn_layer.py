@@ -8,7 +8,12 @@ class TDBatchNorm2d(nn.BatchNorm2d):
 
     Extends nn.BatchNorm2d to compute mean and variance across the temporal dimension (time steps)
     as well as the spatial and channel dimensions.
+
     Based on the tdBN implementation: https://github.com/thiswinex/STBP-simple.
+    This modified implementation removes the running average and variance, given the data processed by
+    Spiking Neural Networks, the mean and variance would be noisy. By setting the mean and variance only
+    to per-batch data, this solves the problem of never performing correctly in evaluation mode.
+
     Link to related paper: Going Deeper With Directly-Trained Larger Spiking Neural Networks
     (https://arxiv.org/pdf/2011.05280).
 
@@ -53,7 +58,7 @@ class TDBatchNorm2d(nn.BatchNorm2d):
         """Applies Threshold Dependent Batch Normalization to the input tensor.
 
         Computes mean and variance over the temporal (time), batch, spatial height, and width
-        dimensions during training, updates running statistics, and uses them during evaluation.
+        dimensions during training.
 
         Args:
             x: Input tensor of shape [T, B, C, H, W].
@@ -61,51 +66,19 @@ class TDBatchNorm2d(nn.BatchNorm2d):
         Returns:
             torch.Tensor: Normalized tensor with the shape [T, B, C, H, W].
         """
-        exp_avg_factor = 0.0
+        # Training
+        # Computes the mean over temporal dimension, depth dimension, and spatial dimension
+        # mean.shape: [C]
+        mean = x.mean([0, 1, 3, 4])
 
-        # Computes average factor
-        if self.training and self.track_running_stats:
-            if self.num_batches_tracked is not None:
-                self.num_batches_tracked += 1
+        # Computes the variance over temporal dimension, depth dimension, and spatial dimension
+        # var.shape: [C]
+        var = x.var([0, 1, 3, 4], unbiased=False)
 
-                if self.momentum is None:
-                    # Cumulative moving average
-                    exp_avg_factor = 1.0 / float(self.num_batches_tracked)
-                else:
-                    # Exponential moving average
-                    exp_avg_factor = self.momentum
-
-        # Checks the model's mode
-        if self.training:
-            # Training
-            # Computes the mean over temporal dimension, depth dimension, and spatial dimension
-            # mean.shape: [C]
-            mean = x.mean([0, 1, 3, 4])
-
-            # Computes the variance over temporal dimension, depth dimension, and spatial dimension
-            # var.shape: [C]
-            var = x.var([0, 1, 3, 4], unbiased=False)
-
-            # Computes the number of elements in the tensor
-            tot_elem = x.numel()
-            C = x.size(2)
-            N = tot_elem / C
-
-            # Updates running mean and variance
-            with torch.no_grad():
-                # Updates running mean, running_mean.shape: [C]
-                self.running_mean = exp_avg_factor * mean + (1 - exp_avg_factor) * self.running_mean
-
-                # Updates running variance with unbiased variance, running_var.shape: [C]
-                self.running_var = exp_avg_factor * var * N / (N - 1) + (1 - exp_avg_factor) * self.running_var
-        else:
-            # Evaluation
-            # Uses running mean and variance
-            # mean.shape: [C]
-            mean = self.running_mean
-
-            # var.shape: [C]
-            var = self.running_var
+        # Computes the number of elements in the tensor
+        tot_elem = x.numel()
+        C = x.size(2)
+        N = tot_elem / C
 
         # Normalizes the data, x.shape: [T, B, C, H, W]
         x = self.alpha * self.V_th * \
@@ -120,7 +93,7 @@ class TDBatchNorm2d(nn.BatchNorm2d):
         return x
 
 
-class LayerTWrapper(nn.Module):  # MODIFY FORWARD PASS WITH A VECTORIZED APPROACH (ONLY FOR LAYER PART, BN IS DONE)
+class LayerTWrapper(nn.Module):
     """Wraps a spatial layer to apply it independently along the temporal dimension.
 
     Attributes:
@@ -132,9 +105,9 @@ class LayerTWrapper(nn.Module):  # MODIFY FORWARD PASS WITH A VECTORIZED APPROAC
         """Initializes the LayerTWrapper.
 
         Args:
-            layer: A PyTorch layer that processes a single time slice of shape [B, C, H, W].
-            batch_norm: A batch normalization layer that can accept a tensor of shape [T, B, C, H, W] and perform
-                normalization across time and spatial dimensions.
+            layer: A PyTorch layer that processes a single time slice of shape [B, C, H, W] or [B, N].
+            batch_norm: A batch normalization layer that can accept a tensor of shape [T, B, C, H, W] or
+                [T, B, N] and perform normalization across time and spatial dimensions.
         """
         super(LayerTWrapper, self).__init__()
 
@@ -145,60 +118,37 @@ class LayerTWrapper(nn.Module):  # MODIFY FORWARD PASS WITH A VECTORIZED APPROAC
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Applies the wrapped layer across the time dimension and then optional batch normalization.
 
-        Iterates over the time dimension of 'x', applies 'self.layer' to each time slice of shape [B, C, H, W],
-        and stacks the outputs back into a tensor of shape [T, B, C, H, W].
-        If 'self.batch_norm' is provided, applies it directly to the stacked tensor in one call.
+        This approach vectorizes the time dimension and allow the layer to process all the time steps in one pass.
 
         Args:
-            x: Input tensor of shape [T, B, C, H, W].
+            x: Input tensor of shape [T, B, C, H, W] or [T, B, N].
 
         Returns:
-            torch.Tensor: Output tensor of shape [T, B, C, H, W] normalized along the temporal and spatial dimensions.
+            torch.Tensor: Output tensor of shape [T, B, C, H, W] or [T, B, N] normalized along
+                the temporal and spatial dimensions.
         """
-        # # List of temporal outputs
-        # x_out = []
-        #
-        # # Retrieves the number of time steps, x.shape: [T, B, C, H, W]
-        # T = x.size(0)
-        #
-        # # Forward pass in time
-        # for t in range(T):
-        #     # Retrieves the sample at time step t, x_t.shape: [B, C, H, W]
-        #     x_t = x[t]
-        #
-        #     # Appends the layer output
-        #     x_out.append(self.layer(x_t))
-        #
-        # # Converts the list into a tensor
-        # x_out = torch.stack(x_out)
-        #
-        # # Applies batch normalization if present
-        # if self.batch_norm is not None:
-        #     # x_out.shape: [T, B, C, H, W]
-        #     x_out = self.batch_norm(x_out)
-        # 1) time & batch dims
-        T, B = x.shape[0], x.shape[1]
-        # 2) the “rest” of dims (could be [C,H,W] or [N])
-        rest = x.shape[2:]
+        # Retrieves the time steps and batch-size of the input tensor
+        # 'in_spatial' could be [C, H, W] or [N]
+        T, B, *in_spatial = x.shape
 
-        # 3) collapse T,B → big batch
-        x_flat = x.reshape(T * B, *rest)
+        # Collapses the time and batch dimensions
+        x = x.reshape(T * B, *in_spatial)
 
-        # 4) single call for either Conv2d, Linear, …
-        y_flat = self.layer(x_flat)
+        # One forward pass for the layer
+        x = self.layer(x)
 
-        # 5) un-collapse
-        out_rest = y_flat.shape[1:]
-        y = y_flat.reshape(T, B, *out_rest)
+        # Retrieves the new spatial dimension
+        _, *out_spatial = x.shape
+        x = x.reshape(T, B, *out_spatial)
 
-        # 6) optional BN (must accept x of shape [T,B,…])
+        # Applies batch normalization if present
         if self.batch_norm is not None:
-            y = self.batch_norm(y)
+            x = self.batch_norm(x)
 
-        return y
+        return x
 
 
-class LeakyTWrapper(nn.Module):     # CHECK IF POSSIBLE TO USE RNN LEAKY
+class LIFTWrapper(nn.Module):
     """Layer that wraps snnTorch Leaky layer to allow it to integrate over input spikes.
 
     Attributes:
@@ -207,12 +157,12 @@ class LeakyTWrapper(nn.Module):     # CHECK IF POSSIBLE TO USE RNN LEAKY
     """
 
     def __init__(self, layer: snn.Leaky) -> None:
-        """Initializes the LeakyTWrapper.
+        """Initializes the LIFTWrapper.
 
         Args:
             layer: A preconfigured snnTorch Leaky neuron layer.
         """
-        super(LeakyTWrapper, self).__init__()
+        super(LIFTWrapper, self).__init__()
 
         self.layer = layer
 
