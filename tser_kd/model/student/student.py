@@ -210,4 +210,10 @@ class SResNet19(nn.Module):
         # Computes the output logits per time steps, x.shape: [T, B, K]
         x = self.t_fc2(x)
 
-        return x
+        # Checks the model mode
+        if self.training:
+            # Outputs the logits for each time step to compute TSCELoss or knowledge distillation
+            return x
+        else:
+            # Outputs the time-average of the logits to compute regular CE loss.
+            return x.mean(0)
