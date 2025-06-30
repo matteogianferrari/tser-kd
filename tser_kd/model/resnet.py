@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from tser_kd.model import conv3x3, conv1x1
-from tser_kd.model.student import TDBatchNorm2d, LayerTWrapper, LeakyTWrapper
 
 
 class ResNetBlock(nn.Module):
