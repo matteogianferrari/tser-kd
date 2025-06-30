@@ -159,28 +159,14 @@ def run_eval(
                 # Resets LIF neurons' hidden states
                 utils.reset(model)
 
-                # Computes the model's logits, logits.shape: [T, B, K]
-                logits = model(inputs)
+            # Computes the model's logits (time-averaged for eval), logits.shape: [B, K]
+            logits = model(inputs)
 
-                # Computes the loss value between logits and targets
-                loss_val = criterion(logits, targets)
-            else:
-                # ANN
-                # Computes the model's logits, logits.shape: [B, K]
-                logits = model(inputs)
+            # Computes the loss value between logits and targets
+            loss_val = criterion(logits, targets)
 
-                # Computes the loss value between logits and targets
-                loss_val = criterion(logits, targets)
-
-        # Checks if the model is an ANN or a SNN
-        if encoder is not None:
-            # SNN
-            # Computes the accuracy of the model
-            acc1, acc5 = accuracy_snn(logits=logits, targets=targets, top_k=(1, 5))
-        else:
-            # ANN
-            # Computes the accuracy of the model
-            acc1, acc5 = accuracy(logits=logits, targets=targets, top_k=(1, 5))
+        # Computes the accuracy of the model
+        acc1, acc5 = accuracy(logits=logits, targets=targets, top_k=(1, 5))
 
         # Retrieves the batch-size
         B = targets.size(0)
