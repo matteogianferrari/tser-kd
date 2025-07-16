@@ -38,13 +38,13 @@ class SResNetBlock(nn.Module):
             layer=conv3x3(in_channels=in_channels, out_channels=out_channels, stride=stride),
             batch_norm=TDBatchNorm2d(num_features=out_channels)
         )
-        self.lif1 = LIFTWrapper(layer=snn.Leaky(beta=beta, learn_beta=True, learn_threshold=True, init_hidden=True))
+        self.lif1 = LIFTWrapper(layer=snn.Leaky(beta=beta, init_hidden=True))
 
         self.t_conv_bn2 = LayerTWrapper(
             layer=conv3x3(in_channels=out_channels, out_channels=out_channels),
             batch_norm=TDBatchNorm2d(num_features=out_channels, alpha=1/(2**0.5))
         )
-        self.lif2 = LIFTWrapper(layer=snn.Leaky(beta=beta, learn_beta=True, learn_threshold=True, init_hidden=True))
+        self.lif2 = LIFTWrapper(layer=snn.Leaky(beta=beta, init_hidden=True))
 
         # Shortcut branch
         self.shortcuts = None
@@ -54,7 +54,7 @@ class SResNetBlock(nn.Module):
                 batch_norm=TDBatchNorm2d(num_features=out_channels, alpha=1/(2**0.5))
             )
 
-        self.lif3 = LIFTWrapper(layer=snn.Leaky(beta=beta, learn_beta=True, learn_threshold=True, init_hidden=True))
+        self.lif3 = LIFTWrapper(layer=snn.Leaky(beta=beta, init_hidden=True))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass for the basic block.
@@ -120,7 +120,7 @@ class SResNet19(nn.Module):
             batch_norm=TDBatchNorm2d(num_features=128)
         )
 
-        self.lif1 = LIFTWrapper(layer=snn.Leaky(beta=beta, learn_beta=True, learn_threshold=True, init_hidden=True))
+        self.lif1 = LIFTWrapper(layer=snn.Leaky(beta=beta, init_hidden=True))
 
         # Block 1
         self.block1 = self._make_block(num_blocks=3, out_channels=128, beta=beta)
@@ -137,7 +137,7 @@ class SResNet19(nn.Module):
         # MLP
         self.t_fc1 = LayerTWrapper(layer=nn.Linear(in_features=512, out_features=256, bias=False))
 
-        self.lif2 = LIFTWrapper(layer=snn.Leaky(beta=beta, learn_beta=True, learn_threshold=True, init_hidden=True))
+        self.lif2 = LIFTWrapper(layer=snn.Leaky(beta=beta, init_hidden=True))
 
         self.t_fc2 = LayerTWrapper(layer=nn.Linear(in_features=256, out_features=num_classes, bias=False))
 
@@ -217,3 +217,39 @@ class SResNet19(nn.Module):
         else:
             # Outputs the time-average of the logits to compute regular CE loss.
             return x.mean(0)
+
+
+def make_student_model(
+        in_channels: int,
+        num_classes: int,
+        beta: float,
+        device: torch.device,
+        state_dict: dict = None
+) -> nn.Module:
+    """Constructs and returns a Spiking ResNet19 student model.
+
+    The model is then moved to the given device.
+    Optionally loads a pre-trained state dictionary into the model.
+
+    Args:
+        in_channels: Number of input channels for the first convolutional layer.
+        num_classes: Number of output classes for the final linear layer.
+        beta: Initial membrane-decay constant for all LIF neurons.
+        device: The device (CPU or GPU) to which the model will be offloaded.
+        state_dict: A state dictionary of pre-trained weights to load into the model.
+
+    Returns:
+        nn.Module: The constructed student model on the specified device.
+    """
+    # Creates the student model custom architecture
+    student = SResNet19(in_channels=in_channels, num_classes=num_classes, beta=beta)
+
+    # Offloads the student model to the specified device
+    student = student.to(device)
+
+    # Checks if a parameter configuration must be loaded
+    if state_dict is not None:
+        # Loads the best parameters for the architecture
+        student.load_state_dict(state_dict)
+
+    return student

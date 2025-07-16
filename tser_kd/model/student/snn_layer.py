@@ -10,9 +10,6 @@ class TDBatchNorm2d(nn.BatchNorm2d):
     as well as the spatial and channel dimensions.
 
     Based on the tdBN implementation: https://github.com/thiswinex/STBP-simple.
-    This modified implementation removes the running average and variance, given the data processed by
-    Spiking Neural Networks, the mean and variance would be noisy. By setting the mean and variance only
-    to per-batch data, this solves the problem of never performing correctly in evaluation mode.
 
     Link to related paper: Going Deeper With Directly-Trained Larger Spiking Neural Networks
     (https://arxiv.org/pdf/2011.05280).
@@ -58,7 +55,7 @@ class TDBatchNorm2d(nn.BatchNorm2d):
         """Applies Threshold Dependent Batch Normalization to the input tensor.
 
         Computes mean and variance over the temporal (time), batch, spatial height, and width
-        dimensions during training.
+        dimensions during training, updates running statistics, and uses them during evaluation.
 
         Args:
             x: Input tensor of shape [T, B, C, H, W].
@@ -66,19 +63,45 @@ class TDBatchNorm2d(nn.BatchNorm2d):
         Returns:
             torch.Tensor: Normalized tensor with the shape [T, B, C, H, W].
         """
-        # Training
-        # Computes the mean over temporal dimension, depth dimension, and spatial dimension
-        # mean.shape: [C]
-        mean = x.mean([0, 1, 3, 4])
+        exp_avg_factor = 0.0
 
-        # Computes the variance over temporal dimension, depth dimension, and spatial dimension
-        # var.shape: [C]
-        var = x.var([0, 1, 3, 4], unbiased=False)
+        # Computes average factor
+        if self.training and self.track_running_stats:
+            if self.num_batches_tracked is not None:
+                self.num_batches_tracked += 1
+                if self.momentum is None:
+                    # Cumulative moving average
+                    exp_avg_factor = 1.0 / float(self.num_batches_tracked)
+                else:
+                    # Exponential moving average
+                    exp_avg_factor = self.momentum
 
-        # Computes the number of elements in the tensor
-        tot_elem = x.numel()
-        C = x.size(2)
-        N = tot_elem / C
+        # Checks the model's mode
+        if self.training:
+            # Training
+            # Computes the mean over temporal dimension, depth dimension, and spatial dimension
+            # mean.shape: [C]
+            mean = x.mean([0, 1, 3, 4])
+
+            # Computes the variance over temporal dimension, depth dimension, and spatial dimension
+            # var.shape: [C]
+            var = x.var([0, 1, 3, 4], unbiased=False)
+
+            # Computes the number of elements in the tensor
+            tot_elem = x.numel()
+            C = x.size(2)
+            N = tot_elem / C
+            with torch.no_grad():
+                # Updates running mean
+                self.running_mean = exp_avg_factor * mean + (1 - exp_avg_factor) * self.running_mean
+
+                # Updates running variance with unbiased variance
+                self.running_var = exp_avg_factor * var * N / (N - 1) + (1 - exp_avg_factor) * self.running_var
+        else:
+            # Evaluation
+            # Uses running mean and variance
+            mean = self.running_mean
+            var = self.running_var
 
         # Normalizes the data, x.shape: [T, B, C, H, W]
         x = self.alpha * self.V_th * \
