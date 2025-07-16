@@ -5,7 +5,7 @@ Modules:
 """
 
 from .snn_layer import LayerTWrapper, LIFTWrapper, TDBatchNorm2d
-from .student import SResNetBlock, SResNet19
+from .student import SResNetBlock, SResNet19, make_student_model
 
 __all__ = [
     "TDBatchNorm2d",
@@ -13,4 +13,5 @@ __all__ = [
     "LIFTWrapper",
     "SResNetBlock",
     "SResNet19",
+    "make_student_model",
 ]
