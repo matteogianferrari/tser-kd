@@ -7,6 +7,7 @@ Sub-Packages:
 from .layer import conv3x3, conv1x1
 from .resnet import ResNetBlock, ResNet19
 from .loss import TSCELoss, TSKLLoss, EntropyReg, TSERKDLoss
+from .transfer import transfer_weights
 
 __all__ = [
     "conv3x3",
@@ -17,4 +18,5 @@ __all__ = [
     "TSKLLoss",
     "EntropyReg",
     "TSERKDLoss",
+    "transfer_weights",
 ]
