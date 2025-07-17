@@ -42,8 +42,6 @@ class WarmupCosineLR(_LRScheduler):
                 constructing the scheduler at the start of training; provide a positive
                 number to resume training from a checkpoint.
         """
-        super().__init__(optimizer, last_epoch)
-
         assert warmup_epochs >= 1, "warmup_epochs must be ≥ 1"
         assert total_epochs >= warmup_epochs, "total_epochs must be ≥ warmup_epochs"
 
@@ -56,6 +54,9 @@ class WarmupCosineLR(_LRScheduler):
         # Start every param group at base_lr
         for pg in optimizer.param_groups:
             pg["lr"] = base_lr
+
+        # Performs bookkeeping (and the first step)
+        super(WarmupCosineLR, self).__init__(optimizer, last_epoch)
 
     def get_lr(self) -> list:
         """Compute the LR for all parameter groups at the upcoming epoch.
