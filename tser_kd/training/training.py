@@ -142,3 +142,117 @@ def run_train(
             pbar.update(1)
 
     return loss.avg, top1.avg, time.time() - start, batch_time.avg
+
+
+def run_kd_train(
+    epoch: int,
+    data_loader: DataLoader,
+    s_model: nn.Module,
+    t_model: nn.Module,
+    criterion: nn.Module,
+    optimizer: optim,
+    device: torch.device,
+    scaler: torch.amp.GradScaler,
+    encoder: Encoder
+) -> tuple:
+    # Device check
+    if device == 'cpu':
+        device_type = 'cpu'
+    else:
+        device_type = 'cuda'
+
+    # Puts the student model in training mode and the teacher in evaluation mode
+    s_model.train()
+    t_model.eval()
+
+    # Metrics recorders
+    batch_time = MetricMeter()
+    total_loss = MetricMeter()
+    ce_loss = MetricMeter()
+    kl_loss = MetricMeter()
+    e_reg = MetricMeter()
+    top1 = MetricMeter()    # Train accuracy
+
+    # Starts epoch timer
+    start = time.time()
+
+    # Dynamic bar
+    with tqdm(
+            total=len(data_loader),
+            desc=f"Epoch {epoch + 1}",
+            unit="batch",
+            leave=True,
+            dynamic_ncols=True,
+            bar_format="{l_bar}{bar}| Batch {n_fmt}/{total_fmt} {postfix}",
+    ) as pbar:
+        # Process the batches in the dataset
+        for idx, (t_inputs, targets) in enumerate(data_loader):
+            # Starts the timer
+            ref_time = time.time()
+
+            # Offload the inputs and targets to the desired device with asynchronous operation
+            # t_inputs.shape: [B, C, H, W]
+            t_inputs = t_inputs.to(device, non_blocking=True)
+
+            # Encodes the data with the specified encoder type, s_inputs.shape: [T, B, C, H, W]
+            s_inputs = encoder(t_inputs)
+
+            # targets.shape: [B]
+            targets = targets.to(device, non_blocking=True)
+
+            # Resets the gradients (set_to_none speeds up the operation)
+            optimizer.zero_grad(set_to_none=True)
+
+            # CUDA automatic mixed precision
+            with torch.amp.autocast(device_type=device_type):
+                # Resets LIF neurons' hidden states
+                utils.reset(s_model)
+
+                # Computes the student model's logits, s_logits.shape: [T, B, K]
+                s_logits = s_model(s_inputs)
+
+                with torch.no_grad():
+                    # Computes the teacher model's logits, t_logits.shape: [B, K]
+                    t_logits = t_model(t_inputs)
+
+                # Computes the loss values using knowledge distillation with entropy regularization
+                total_val, ce_val, kl_val, e_val = criterion(t_logits, s_logits, targets)
+
+            # Scales AMP loss and apply backprop
+            scaler.scale(total_val).backward()
+
+            #
+            torch.nn.utils.clip_grad_norm_(s_model.parameters(), max_norm=2.0)
+
+            # optimizer.step() is called automatically
+            scaler.step(optimizer)
+
+            # Updates the scale for the next iteration
+            scaler.update()
+
+            # Computes the accuracy of the model
+            acc1, = accuracy_snn(logits=s_logits, targets=targets, top_k=(1,))
+
+            # Retrieves the batch-size
+            B = targets.size(0)
+
+            # Updates the metrics
+            total_loss.update(val=total_val.item(), n=B)
+            ce_loss.update(val=ce_val.item(), n=B)
+            kl_loss.update(val=kl_val.item(), n=B)
+            e_reg.update(val=e_val.item(), n=B)
+            top1.update(val=acc1.item(), n=B)
+            batch_time.update(val=time.time() - ref_time)
+
+            # Bar update
+            pbar.set_postfix(
+                total_loss=f"{total_loss.avg:.4f}",
+                ce_loss=f"{ce_loss.avg:.4f}",
+                kl_loss=f"{kl_loss.avg:.4f}",
+                e_reg=f"{e_reg.avg:.4f}",
+                acc=f"{top1.avg:.2f}%",
+                refresh=False
+            )
+            pbar.update(1)
+
+    return total_loss.avg, ce_loss.avg, kl_loss.avg, e_reg.avg, top1.avg, time.time() - start, batch_time.avg
