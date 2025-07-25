@@ -3,15 +3,16 @@ import torch.nn as nn
 
 
 def transfer_weights(snn: nn.Module, ann: nn.Module, flag: bool = False) -> None:
-    """Transfers the learnable weights of an ANN to a SNN.
+    """Transfers the learnable weights and biases of an ANN to a SNN.
 
     This function assumes that the 2 models share the same architecture, so that
-    the weights can be transferred without conflicts.
+    the weights and biases can be transferred without conflicts.
 
     All copy operations are wrapped in 'torch.no_grad()' so that PyTorch’s autograd
     engine does not record the in‑place writes.
 
-    Biases, running statistics in batch norm, and other buffers are not copied.
+    Biases in FC1 and FC2 are also copied. Other biases, batch norm statistics,
+    and other buffers are not copied.
 
     Args:
         snn: Target Spiking Neural Network that will receive the weights.
@@ -79,4 +80,6 @@ def transfer_weights(snn: nn.Module, ann: nn.Module, flag: bool = False) -> None
         # FC
         # Copy operations
         _copy(source=ann.fc1.weight, target=snn.t_fc1.layer.weight, trainable=flag)
+        _copy(source=ann.fc1.bias, target=snn.t_fc1.layer.bias, trainable=flag)
         _copy(source=ann.fc2.weight, target=snn.t_fc2.layer.weight, trainable=flag)
+        _copy(source=ann.fc2.bias, target=snn.t_fc2.layer.bias, trainable=flag) 
