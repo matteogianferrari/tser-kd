@@ -70,4 +70,4 @@ def adapt_network(ann: nn.Module, in_channels: int, num_classes: int) -> None:
     ann.maxpool = nn.Identity()
 
     # Adapts the FC layer for classification
-    ann.fc = nn.Linear(in_features=ann.fc.in_features, out_features=num_classes)
+    ann.fc = nn.Linear(in_features=ann.fc.in_features, out_features=num_classes, bias=False)
