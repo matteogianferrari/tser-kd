@@ -101,9 +101,9 @@ class ResNet19(nn.Module):
 
         self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
 
-        self.fc1 = nn.Linear(in_features=512, out_features=256, bias=True)
+        self.fc1 = nn.Linear(in_features=512, out_features=256, bias=False)
         self.relu = nn.ReLU(inplace=True)
-        self.fc2 = nn.Linear(in_features=256, out_features=num_classes, bias=True)
+        self.fc2 = nn.Linear(in_features=256, out_features=num_classes, bias=False)
 
     def _make_block(self, num_blocks: int, out_channels: int) -> nn.Sequential:
         """

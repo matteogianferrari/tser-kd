@@ -80,6 +80,4 @@ def transfer_weights(snn: nn.Module, ann: nn.Module, flag: bool = False) -> None
         # FC
         # Copy operations
         _copy(source=ann.fc1.weight, target=snn.t_fc1.layer.weight, trainable=flag)
-        _copy(source=ann.fc1.bias, target=snn.t_fc1.layer.bias, trainable=flag)
         _copy(source=ann.fc2.weight, target=snn.t_fc2.layer.weight, trainable=flag)
-        _copy(source=ann.fc2.bias, target=snn.t_fc2.layer.bias, trainable=flag) 

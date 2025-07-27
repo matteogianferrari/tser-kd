@@ -135,11 +135,11 @@ class SResNet19(nn.Module):
         self.t_avg_pool = LayerTWrapper(layer=nn.AdaptiveAvgPool2d((1, 1)))
 
         # MLP
-        self.t_fc1 = LayerTWrapper(layer=nn.Linear(in_features=512, out_features=256, bias=True))
+        self.t_fc1 = LayerTWrapper(layer=nn.Linear(in_features=512, out_features=256, bias=False))
 
         self.lif2 = LIFTWrapper(layer=snn.Leaky(beta=beta, init_hidden=True))
 
-        self.t_fc2 = LayerTWrapper(layer=nn.Linear(in_features=256, out_features=num_classes, bias=True))
+        self.t_fc2 = LayerTWrapper(layer=nn.Linear(in_features=256, out_features=num_classes, bias=False))
 
     def _make_block(self, num_blocks: int, out_channels: int, beta: float) -> nn.Sequential:
         """Builds a SResNetBlock with the specific configuration.

@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torchvision.models import resnet34, ResNet34_Weights
+from torchvision.models import resnet34, resnet18, ResNet34_Weights, ResNet18_Weights
 from tser_kd.model import ResNet19
 
 
@@ -13,6 +13,8 @@ def make_teacher_model(arch: str, in_channels: int, num_classes: int, device: to
 
     Currently, supports:
         - 'resnet-34': A ResNet-34 backbone pre-trained on ImageNet, with its first convolutional layer and final
+            fully connected layer modified for CIFAR-10.
+        - 'resnet-18': A ResNet-18 backbone pre-trained on ImageNet, with its first convolutional layer and final
             fully connected layer modified for CIFAR-10.
         - 'resnet-19': A custom ResNet-19 backbone for CIFAR-10.
 
@@ -33,19 +35,13 @@ def make_teacher_model(arch: str, in_channels: int, num_classes: int, device: to
         # Creates the base teacher model architecture for ImageNet
         teacher = resnet34(progress=True, weights=ResNet34_Weights.IMAGENET1K_V1)
 
-        # Adapts the stem layer of the architecture to CIFAR10
-        teacher.conv1 = nn.Conv2d(
-            in_channels=in_channels,
-            out_channels=64,
-            kernel_size=3,
-            stride=1,
-            padding=1,
-            bias=False
-        )
-        teacher.maxpool = nn.Identity()
+        # Adapts the network to CIFAR10
+        adapt_network(ann=teacher, in_channels=in_channels, num_classes=num_classes)
+    elif arch == 'resnet-18':
+        teacher = resnet18(progress=True, weights=ResNet18_Weights.IMAGENET1K_V1)
 
-        # Adapts the FC layer for classification
-        teacher.fc = nn.Linear(in_features=teacher.fc.in_features, out_features=num_classes)
+        # Adapts the network to CIFAR10
+        adapt_network(ann=teacher, in_channels=in_channels, num_classes=num_classes)
     elif arch == 'resnet-19':
         # Creates the teacher model custom architecture
         teacher = ResNet19(in_channels=in_channels, num_classes=num_classes)
@@ -59,3 +55,19 @@ def make_teacher_model(arch: str, in_channels: int, num_classes: int, device: to
         teacher.load_state_dict(state_dict)
 
     return teacher
+
+
+def adapt_network(ann: nn.Module, in_channels: int, num_classes: int) -> None:
+    # Adapts the stem layer of the architecture to CIFAR10
+    ann.conv1 = nn.Conv2d(
+        in_channels=in_channels,
+        out_channels=64,
+        kernel_size=3,
+        stride=1,
+        padding=1,
+        bias=False
+    )
+    ann.maxpool = nn.Identity()
+
+    # Adapts the FC layer for classification
+    ann.fc = nn.Linear(in_features=ann.fc.in_features, out_features=num_classes)
