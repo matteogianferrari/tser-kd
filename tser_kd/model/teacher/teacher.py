@@ -36,12 +36,12 @@ def make_teacher_model(arch: str, in_channels: int, num_classes: int, device: to
         teacher = resnet34(progress=True, weights=ResNet34_Weights.IMAGENET1K_V1)
 
         # Adapts the network to CIFAR10
-        adapt_network(ann=teacher, in_channels=in_channels, num_classes=num_classes)
+        _adapt_network(ann=teacher, in_channels=in_channels, num_classes=num_classes)
     elif arch == 'resnet-18':
         teacher = resnet18(progress=True, weights=ResNet18_Weights.IMAGENET1K_V1)
 
         # Adapts the network to CIFAR10
-        adapt_network(ann=teacher, in_channels=in_channels, num_classes=num_classes)
+        _adapt_network(ann=teacher, in_channels=in_channels, num_classes=num_classes)
     elif arch == 'resnet-19':
         # Creates the teacher model custom architecture
         teacher = ResNet19(in_channels=in_channels, num_classes=num_classes)
@@ -57,7 +57,7 @@ def make_teacher_model(arch: str, in_channels: int, num_classes: int, device: to
     return teacher
 
 
-def adapt_network(ann: nn.Module, in_channels: int, num_classes: int) -> None:
+def _adapt_network(ann: nn.Module, in_channels: int, num_classes: int) -> None:
     # Adapts the stem layer of the architecture to CIFAR10
     ann.conv1 = nn.Conv2d(
         in_channels=in_channels,
