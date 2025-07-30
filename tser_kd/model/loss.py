@@ -128,10 +128,6 @@ class TSKLLoss(nn.Module):
         # Computes the KL divergence between the log probabilities and performs averaging
         loss_val = F.kl_div(input=s_log_prob, target=t_log_prob, log_target=True, reduction='batchmean')
 
-        # Multiplies the loss value by squared tau to avoid vanishing gradient and slower training
-        # (typical operation performed in knowledge distillation)
-        loss_val = loss_val * (self.tau ** 2)
-
         return loss_val
 
 
@@ -252,6 +248,8 @@ class TSERKDLoss(nn.Module):
         e_reg = self.e_reg(s_logits=s_logits)
 
         # Computes the total loss value
-        total_loss = (1 - self.alpha) * ce_loss + self.alpha * kl_loss - self.gamma * e_reg
+        # Multiplies the KL loss value by squared tau to avoid vanishing gradient and slower training
+        # (typical operation performed in knowledge distillation)
+        total_loss = (1 - self.alpha) * ce_loss + self.alpha * (self.tau ** 2) * kl_loss - self.gamma * e_reg
 
         return total_loss, ce_loss, kl_loss, e_reg
