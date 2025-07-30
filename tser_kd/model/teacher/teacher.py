@@ -46,13 +46,13 @@ def make_teacher_model(arch: str, in_channels: int, num_classes: int, device: to
         # Creates the teacher model custom architecture
         teacher = ResNet19(in_channels=in_channels, num_classes=num_classes)
 
-    # Offloads the teacher model to the specified device
-    teacher = teacher.to(device)
-
     # Checks if a parameter configuration must be loaded
     if state_dict is not None:
         # Loads the best parameters for the architecture
         teacher.load_state_dict(state_dict)
+
+    # Offloads the teacher model to the specified device
+    teacher = teacher.to(device)
 
     return teacher
 

@@ -274,12 +274,12 @@ def make_student_model(
             fc_hidden_dims=[256]
         )
 
-    # Offloads the student model to the specified device
-    student = student.to(device)
-
     # Checks if a parameter configuration must be loaded
     if state_dict is not None:
         # Loads the best parameters for the architecture
         student.load_state_dict(state_dict)
+
+    # Offloads the student model to the specified device
+    student = student.to(device)
 
     return student
