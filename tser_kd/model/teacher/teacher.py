@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from torchvision.models import resnet18, ResNet18_Weights
-from tser_kd.model import ResNet19
 
 
 def make_teacher_model(arch: str, in_channels: int, num_classes: int, device: torch.device, state_dict: dict = None) -> nn.Module:
