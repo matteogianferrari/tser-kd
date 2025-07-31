@@ -47,26 +47,20 @@ class SCNN(nn.Module):
         )
 
         # Conv2
-        self.conv2 = LayerTWrapper(layer=conv3x3(in_channels=64, out_channels=64))
+        self.conv2 = LayerTWrapper(layer=conv3x3(in_channels=64, out_channels=128, stride=2))
         self.lif2 = LIFTWrapper(
             layer=snn.Leaky(beta=beta, threshold=threshold, init_hidden=True, learn_beta=learn_beta, learn_threshold=learn_threshold)
         )
 
         # Conv3
-        self.conv3 = LayerTWrapper(layer=conv3x3(in_channels=64, out_channels=128, stride=2))
+        self.conv3 = LayerTWrapper(layer=conv3x3(in_channels=128, out_channels=128))
         self.lif3 = LIFTWrapper(
             layer=snn.Leaky(beta=beta, threshold=threshold, init_hidden=True, learn_beta=learn_beta, learn_threshold=learn_threshold)
         )
 
         # Conv4
-        self.conv4 = LayerTWrapper(layer=conv3x3(in_channels=128, out_channels=128))
+        self.conv4 = LayerTWrapper(layer=conv3x3(in_channels=128, out_channels=256, stride=2))
         self.lif4 = LIFTWrapper(
-            layer=snn.Leaky(beta=beta, threshold=threshold, init_hidden=True, learn_beta=learn_beta, learn_threshold=learn_threshold)
-        )
-
-        # Conv5
-        self.conv5 = LayerTWrapper(layer=conv3x3(in_channels=128, out_channels=256, stride=2))
-        self.lif5 = LIFTWrapper(
             layer=snn.Leaky(beta=beta, threshold=threshold, init_hidden=True, learn_beta=learn_beta, learn_threshold=learn_threshold)
         )
 
@@ -91,9 +85,6 @@ class SCNN(nn.Module):
         # x.shape: [T, B, 64, 28, 28]
 
         x = self.lif1(self.conv1(x))
-        # x.shape: [T, B, 64, 28, 28]
-
-        x = self.lif2(self.conv2(x))
         # x.shape: [T, B, 64, 28, 28]
 
         x = self.lif3(self.conv3(x))
