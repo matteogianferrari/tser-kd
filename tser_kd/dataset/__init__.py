@@ -7,7 +7,7 @@ Modules:
 """
 
 from .cutout import CutOut
-from .cifar10 import load_cifar10_data
+from .mnist import load_cifar10_data
 from .encoder import Encoder, StaticEncoder, RateEncoder
 
 __all__ = [
