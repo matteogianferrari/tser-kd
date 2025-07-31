@@ -5,8 +5,8 @@ from tser_kd.model import conv3x3, conv1x1
 from tser_kd.model.student import LayerTWrapper, LIFTWrapper
 
 
-class SCNN(nn.Module):
-    """Spiking CNN architecture.
+class SCNN_T(nn.Module):
+    """Spiking tiny CNN architecture.
 
     This spiking CNN is a test architecture that is simple without residual connections and batch normalization.
 
@@ -22,7 +22,7 @@ class SCNN(nn.Module):
             learn_beta: bool = False,
             learn_threshold: bool = False
     ) -> None:
-        """Initializes the SCNN.
+        """Initializes the SCNN_T.
 
         Args:
             in_channels: Number of channels in the input frames.
@@ -32,7 +32,92 @@ class SCNN(nn.Module):
             learn_beta: Flag that allows to learn the membrane decay for all LIF neurons.
             learn_threshold: Flag that allows to learn the membrane voltage threshold for all LIF neurons.
         """
-        super(SCNN, self).__init__()
+        super(SCNN_T, self).__init__()
+
+        # Stem block
+        self.stem = LayerTWrapper(layer=conv3x3(in_channels=in_channels, out_channels=64))
+        self.lif_stem = LIFTWrapper(
+            layer=snn.Leaky(beta=beta, threshold=threshold, init_hidden=True, learn_beta=learn_beta, learn_threshold=learn_threshold)
+        )
+
+        # Conv1
+        self.conv1 = LayerTWrapper(layer=conv3x3(in_channels=64, out_channels=128, stride=2))
+        self.lif1 = LIFTWrapper(
+            layer=snn.Leaky(beta=beta, threshold=threshold, init_hidden=True, learn_beta=learn_beta, learn_threshold=learn_threshold)
+        )
+
+        # Conv2
+        self.conv2 = LayerTWrapper(layer=conv3x3(in_channels=128, out_channels=256, stride=2))
+        self.lif2 = LIFTWrapper(
+            layer=snn.Leaky(beta=beta, threshold=threshold, init_hidden=True, learn_beta=learn_beta, learn_threshold=learn_threshold)
+        )
+
+        # Global pool
+        self.avg_pool = LayerTWrapper(layer=nn.AdaptiveAvgPool2d((1, 1)))
+
+        self.mlp = LayerTWrapper(layer=nn.Linear(in_features=256, out_features=num_classes, bias=False))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass.
+
+        Args:
+            x: Input tensor of shape [T, B, C, H, W].
+
+        Returns:
+            torch.Tensor: Logits for every time step if the model is in training mode, shape [T, B, K],
+                mean of logits over time steps if the model is in eval mode, shape [B, K].
+        """
+        # x.shape: [T, B, 1, 28, 28]
+
+        x = self.lif_stem(self.stem(x))
+        # x.shape: [T, B, 64, 28, 28]
+
+        x = self.lif1(self.conv1(x))
+        # x.shape: [T, B, 128, 14, 14]
+
+        x = self.lif2(self.conv2(x))
+        # x.shape: [T, B, 256, 7, 7]
+
+        # Global pool
+        x = self.avg_pool(x)
+        x = x.view(x.size(0), x.size(1), x.size(2))
+
+        # MLP
+        x = self.mlp(x)
+
+        # Regulates the output based on the model current mode
+        return x if self.training else x.mean(0)
+
+
+
+class SCNN_S(nn.Module):
+    """Spiking small CNN architecture.
+
+    This spiking CNN is a test architecture that is simple without residual connections and batch normalization.
+
+
+    """
+
+    def __init__(
+            self,
+            in_channels: int,
+            num_classes: int,
+            beta: float,
+            threshold: float,
+            learn_beta: bool = False,
+            learn_threshold: bool = False
+    ) -> None:
+        """Initializes the SCNN_S.
+
+        Args:
+            in_channels: Number of channels in the input frames.
+            num_classes: Number of output classes.
+            beta: Membrane-decay constant for all LIF neurons.
+            threshold: Membrane voltage threshold for all LIF neurons.
+            learn_beta: Flag that allows to learn the membrane decay for all LIF neurons.
+            learn_threshold: Flag that allows to learn the membrane voltage threshold for all LIF neurons.
+        """
+        super(SCNN_S, self).__init__()
 
         # Stem block
         self.stem = LayerTWrapper(layer=conv3x3(in_channels=in_channels, out_channels=64))
@@ -124,7 +209,8 @@ def make_student_model(
     Optionally loads a pre-trained state dictionary into the model.
 
     Currently, supports:
-        - 'scnn': Custom test spiking CNN.
+        - 'scnn-t': Custom test tiny spiking CNN-T.
+        - 'scnn-s': Custom test small spiking CNN-S.
 
     Args:
         arch: Architecture name.
@@ -143,9 +229,19 @@ def make_student_model(
     student = None
 
     # Custom architecture
-    if arch == 'scnn':
+    if arch == 'scnn-t':
         # Creates the student model architecture
-        student = SCNN(
+        student = SCNN_T(
+            in_channels=in_channels,
+            num_classes=num_classes,
+            beta=beta,
+            threshold=threshold,
+            learn_beta=learn_beta,
+            learn_threshold=learn_threshold
+        )
+    elif arch == 'scnn-s':
+        # Creates the student model architecture
+        student = SCNN_S(
             in_channels=in_channels,
             num_classes=num_classes,
             beta=beta,
