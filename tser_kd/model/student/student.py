@@ -87,13 +87,13 @@ class SCNN(nn.Module):
         x = self.lif1(self.conv1(x))
         # x.shape: [T, B, 64, 28, 28]
 
+        x = self.lif2(self.conv2(x))
+        # x.shape: [T, B, 128, 14, 14]
+
         x = self.lif3(self.conv3(x))
         # x.shape: [T, B, 128, 14, 14]
 
         x = self.lif4(self.conv4(x))
-        # x.shape: [T, B, 128, 14, 14]
-
-        x = self.lif5(self.conv5(x))
         # x.shape: [T, B, 256, 7, 7]
 
         # Global pool
