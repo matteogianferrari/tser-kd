@@ -53,7 +53,7 @@ class SCNN(nn.Module):
         )
 
         # Conv3
-        self.conv3 = LayerTWrapper(layer=conv3x3(in_channels=128, out_channels=128, stride=2))
+        self.conv3 = LayerTWrapper(layer=conv3x3(in_channels=64, out_channels=128, stride=2))
         self.lif3 = LIFTWrapper(
             layer=snn.Leaky(beta=beta, threshold=threshold, init_hidden=True, learn_beta=learn_beta, learn_threshold=learn_threshold)
         )
