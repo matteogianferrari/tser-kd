@@ -10,7 +10,7 @@ def load_mnist_data() -> tuple:
         tuple: A 3-tuple containing:
             - train_dataset: The MNIST training set.
             - val_dataset: The MNIST validation (test) set.
-            - num_class: The number of classes.
+            - num_classes: The number of classes.
     """
     # Number of classes
     num_classes = 10
@@ -21,7 +21,7 @@ def load_mnist_data() -> tuple:
         transforms.Normalize((0.1307,), (0.3081,))
     ])
 
-    # Downloads the CIFAR10 datasets
+    # Downloads the MNIST datasets
     train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
     val_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
 

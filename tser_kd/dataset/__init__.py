@@ -7,12 +7,12 @@ Modules:
 """
 
 from .cutout import CutOut
-from .mnist import load_cifar10_data
+from .mnist import load_mnist_data
 from .encoder import Encoder, StaticEncoder, RateEncoder
 
 __all__ = [
     "CutOut",
-    "load_cifar10_data",
+    "load_mnist_data",
     "Encoder",
     "StaticEncoder",
     "RateEncoder",
