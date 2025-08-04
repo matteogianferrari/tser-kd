@@ -8,16 +8,18 @@ class LayerTWrapper(nn.Module):
 
     Attributes:
         layer: The spatial layer to execute at each time step.
-        batch_norm: Batch normalization layer that expects input of shape [T, B, C, H, W].
+        batch_norm: Batch normalization layer that expects input of shape [B, C, T, H, W].
     """
 
     def __init__(self, layer: nn.Module, batch_norm: nn.Module = None) -> None:
         """Initializes the LayerTWrapper.
 
+        The batch normalization doesn't work for linear layers.
+
         Args:
             layer: A PyTorch layer that processes a single time slice of shape [B, C, H, W] or [B, N].
-            batch_norm: A batch normalization layer that can accept a tensor of shape [T, B, C, H, W] or
-                [T, B, N] and perform normalization across time and spatial dimensions.
+            batch_norm: A batch normalization layer that can accept a tensor of shape [T, B, C, H, W]
+                and perform normalization across time and spatial dimensions.
         """
         super(LayerTWrapper, self).__init__()
 
@@ -53,7 +55,14 @@ class LayerTWrapper(nn.Module):
 
         # Applies batch normalization if present
         if self.batch_norm is not None:
+            # Changes the order of dimensions in the tensor
+            x = x.permute(1, 2, 0, 3, 4).contiguous()
+
+            # Applies batch normalization
             x = self.batch_norm(x)
+
+            # Changes the order of dimensions in the tensor
+            x = x.permute(2, 0, 1, 3, 4).contiguous()
 
         return x
 
