@@ -22,7 +22,17 @@ class SResNetBlock(nn.Module):
         lif3: Final LIF neuron applied after summing the residual and shortcut paths.
     """
 
-    def __init__(self, in_channels: int, out_channels: int, stride: int, beta: float) -> None:
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            stride: int,
+            beta: float,
+            threshold: float,
+            spike_grad,
+            learn_beta: bool = False,
+            learn_threshold: bool = False
+    ) -> None:
         """Initializes the SResNetBlock.
 
         Args:
@@ -38,13 +48,27 @@ class SResNetBlock(nn.Module):
             layer=conv3x3(in_channels=in_channels, out_channels=out_channels, stride=stride),
             batch_norm=nn.BatchNorm3d(num_features=out_channels)
         )
-        self.lif1 = LIFTWrapper(layer=snn.Leaky(beta=beta, init_hidden=True))
+        self.lif1 = LIFTWrapper(layer=snn.Leaky(
+            beta=beta,
+            threshold=threshold,
+            init_hidden=True,
+            learn_beta=learn_beta,
+            learn_threshold=learn_threshold,
+            spike_grad=spike_grad
+        ))
 
         self.t_conv_bn2 = LayerTWrapper(
             layer=conv3x3(in_channels=out_channels, out_channels=out_channels),
             batch_norm=nn.BatchNorm3d(num_features=out_channels)
         )
-        self.lif2 = LIFTWrapper(layer=snn.Leaky(beta=beta, init_hidden=True))
+        self.lif2 = LIFTWrapper(layer=snn.Leaky(
+            beta=beta,
+            threshold=threshold,
+            init_hidden=True,
+            learn_beta=learn_beta,
+            learn_threshold=learn_threshold,
+            spike_grad=spike_grad
+        ))
 
         # Shortcut branch
         self.shortcuts = None
@@ -54,7 +78,14 @@ class SResNetBlock(nn.Module):
                 batch_norm=nn.BatchNorm3d(num_features=out_channels)
             )
 
-        self.lif3 = LIFTWrapper(layer=snn.Leaky(beta=beta, init_hidden=True))
+        self.lif3 = LIFTWrapper(layer=snn.Leaky(
+            beta=beta,
+            threshold=threshold,
+            init_hidden=True,
+            learn_beta=learn_beta,
+            learn_threshold=learn_threshold,
+            spike_grad=spike_grad
+        ))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass for the basic block.
@@ -102,10 +133,14 @@ class SResNet(nn.Module):
             in_channels: int,
             num_classes: int,
             beta: float,
+            threshold: float,
+            spike_grad,
             stem_channels: int,
             stage_blocks: list[int],
             stage_channels: list[int],
-            fc_hidden_dims: list[int] | None = None
+            fc_hidden_dims: list[int] | None = None,
+            learn_beta: bool = False,
+            learn_threshold: bool = False,
     ) -> None:
         """Initializes the SResNet.
 
@@ -120,12 +155,26 @@ class SResNet(nn.Module):
         """
         super(SResNet, self).__init__()
 
+        self.beta = beta
+        self.threshold = threshold
+        self.learn_beta = learn_beta
+        self.learn_threshold = learn_threshold
+        self.spike_grad = spike_grad
+
         # Stem block
         self.stem = LayerTWrapper(
             layer=conv3x3(in_channels=in_channels, out_channels=stem_channels),
             batch_norm=nn.BatchNorm3d(num_features=stem_channels),
         )
-        self.lif_stem = LIFTWrapper(layer=snn.Leaky(beta=beta, init_hidden=True))
+
+        self.lif_stem = LIFTWrapper(layer=snn.Leaky(
+            beta=beta,
+            threshold=threshold,
+            init_hidden=True,
+            learn_beta=learn_beta,
+            learn_threshold=learn_threshold,
+            spike_grad=spike_grad
+        ))
 
         # Residual blocks
         self.stages = nn.ModuleList()
@@ -135,7 +184,7 @@ class SResNet(nn.Module):
         for blocks, out_c in zip(stage_blocks, stage_channels):
             # Appends a customized stage
             self.stages.append(
-                self._make_stage(num_blocks=blocks, in_channels=in_c, out_channels=out_c, beta=beta)
+                self._make_stage(num_blocks=blocks, in_channels=in_c, out_channels=out_c)
             )
             # Updates the input channels for the next stage
             in_c = out_c
@@ -165,14 +214,13 @@ class SResNet(nn.Module):
         # Creates the MLP head
         self.mlp = nn.Sequential(*mlp_layers)
 
-    def _make_stage(self, num_blocks: int, in_channels: int, out_channels: int, beta: float) -> nn.Sequential:
+    def _make_stage(self, num_blocks: int, in_channels: int, out_channels: int) -> nn.Sequential:
         """Builds a SResNet stage with the specific configuration.
 
         Args:
             num_blocks: How many SResNet blocks to stack.
             in_channels: Number of input channels for the stage.
             out_channels: Number of output channels for the stage.
-            beta: Initial membrane-decay constant for the stage.
 
         Returns:
             A sequential container with the specified configuration.
@@ -184,9 +232,16 @@ class SResNet(nn.Module):
             stride = 2 if (block_i == 0 and in_channels != out_channels) else 1
 
             # Adds a block
-            layers.append(
-                SResNetBlock(in_channels=in_channels, out_channels=out_channels, stride=stride, beta=beta)
-            )
+            layers.append(SResNetBlock(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                stride=stride,
+                beta=self.beta,
+                threshold=self.threshold,
+                learn_beta=self.learn_beta,
+                learn_threshold=self.learn_threshold,
+                spike_grad=self.spike_grad
+            ))
 
             # Updates the input channels for the next block
             in_channels = out_channels
@@ -414,6 +469,7 @@ def make_student_model(
         num_classes: int,
         beta: float,
         threshold: float,
+        spike_grad,
         device: torch.device,
         learn_beta: bool = False,
         learn_threshold: bool = False,
@@ -452,9 +508,13 @@ def make_student_model(
             in_channels=in_channels,
             num_classes=num_classes,
             beta=beta,
+            threshold=threshold,
+            spike_grad=spike_grad,
             stem_channels=64,
             stage_blocks=[2, 2, 2, 2],
-            stage_channels=[64, 128, 256, 512]
+            stage_channels=[64, 128, 256, 512],
+            learn_beta=learn_beta,
+            learn_threshold=learn_threshold
         )
     elif arch == 'scnn-t':
         # Creates the student model architecture
