@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
-from torchvision.models import resnet18, ResNet18_Weights
+from torchvision.models import resnet18, ResNet18_Weights, resnet34, ResNet34_Weights
+from tser_kd.model.teacher import ResNet19
 
 
 def make_teacher_model(arch: str, in_channels: int, num_classes: int, device: torch.device, state_dict: dict = None) -> nn.Module:
@@ -11,8 +12,11 @@ def make_teacher_model(arch: str, in_channels: int, num_classes: int, device: to
     Optionally loads a pre-trained state dictionary into the model.
 
     Currently, supports:
+        - 'resnet-34': A ResNet-34 backbone pre-trained on ImageNet, with its first convolutional layer and final
+            fully connected layer modified for CIFAR-10.
+        - 'resnet-19': A custom ResNet-19 backbone for CIFAR-10.
         - 'resnet-18': A ResNet-18 backbone pre-trained on ImageNet, with its first convolutional layer and final
-            fully connected layer modified for MNIST.
+            fully connected layer modified for CIFAR-10.
 
     Args:
         arch: Architecture name.
@@ -27,7 +31,16 @@ def make_teacher_model(arch: str, in_channels: int, num_classes: int, device: to
     teacher = None
 
     # ResNet architecture
-    if arch == 'resnet-18':
+    if arch == 'resnet-34':
+        # Creates the base teacher model architecture for ImageNet
+        teacher = resnet34(progress=True, weights=ResNet34_Weights.IMAGENET1K_V1)
+
+        # Adapts the network to CIFAR10
+        _adapt_network(ann=teacher, in_channels=in_channels, num_classes=num_classes)
+    elif arch == 'resnet-19':
+        # Creates the teacher model custom architecture
+        teacher = ResNet19(in_channels=in_channels, num_classes=num_classes)
+    elif arch == 'resnet-18':
         teacher = resnet18(progress=True, weights=ResNet18_Weights.IMAGENET1K_V1)
 
         # Adapts the network to CIFAR10
@@ -45,7 +58,7 @@ def make_teacher_model(arch: str, in_channels: int, num_classes: int, device: to
 
 
 def _adapt_network(ann: nn.Module, in_channels: int, num_classes: int) -> None:
-    # Adapts the stem layer of the architecture to MNIST
+    # Adapts the stem layer of the architecture to CIFAR10
     ann.conv1 = nn.Conv2d(
         in_channels=in_channels,
         out_channels=64,

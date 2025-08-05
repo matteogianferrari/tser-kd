@@ -6,7 +6,11 @@ Modules:
 """
 
 from .teacher import make_teacher_model
+from .resnet import ResNetBlock, ResNet19
+
 
 __all__ = [
     "make_teacher_model",
+    "ResNetBlock",
+    "ResNet19",
 ]
