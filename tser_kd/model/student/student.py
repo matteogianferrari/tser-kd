@@ -138,7 +138,6 @@ class SResNet(nn.Module):
             stem_channels: int,
             stage_blocks: list[int],
             stage_channels: list[int],
-            fc_hidden_dims: list[int] | None = None,
             learn_beta: bool = False,
             learn_threshold: bool = False,
     ) -> None:
@@ -151,7 +150,6 @@ class SResNet(nn.Module):
             stem_channels: Number of channels in the stem layer.
             stage_blocks: List containing the number of basic blocks for each stage.
             stage_channels: List containing the number of channels for each stage.
-            fc_hidden_dims: List containing the number of features for each intermediate MLP layer.
         """
         super(SResNet, self).__init__()
 
@@ -193,26 +191,7 @@ class SResNet(nn.Module):
         self.t_avg_pool = LayerTWrapper(layer=nn.AdaptiveAvgPool2d((1, 1)))
 
         # MLP head
-        # Initialization depending on if the architecture has multiple layers in the MLP or not
-        fc_hidden_dims = fc_hidden_dims or []
-
-        # Creates a list containing the number of features that the MLP will possess
-        # Starts with the output of the global average pooling, then adds hidden features dimension if any,
-        # then ends with the number of classes
-        dims = [stage_channels[-1], *fc_hidden_dims, num_classes]
-
-        # Creates a list containing the layers in the MLP head
-        mlp_layers = []
-        for i, (d_in, d_out) in enumerate(zip(dims[:-1], dims[1:])):
-            # Adds the customized layer into the list
-            mlp_layers.append(LayerTWrapper(layer=nn.Linear(in_features=d_in, out_features=d_out, bias=False)))
-
-            # Adds a LIF layer between the FC layers if more than one is present
-            if i < len(dims) - 2:
-                mlp_layers.append(LIFTWrapper(layer=snn.Leaky(beta=beta, init_hidden=True)))
-
-        # Creates the MLP head
-        self.mlp = nn.Sequential(*mlp_layers)
+        self.mlp = LayerTWrapper(layer=nn.Linear(in_features=in_c, out_features=num_classes, bias=False))
 
     def _make_stage(self, num_blocks: int, in_channels: int, out_channels: int) -> nn.Sequential:
         """Builds a SResNet stage with the specific configuration.
@@ -513,6 +492,20 @@ def make_student_model(
             stem_channels=64,
             stage_blocks=[2, 2, 2, 2],
             stage_channels=[64, 128, 256, 512],
+            learn_beta=learn_beta,
+            learn_threshold=learn_threshold
+        )
+    elif arch == 'sresnet-19':
+        # Creates the student model architecture
+        student = SResNet(
+            in_channels=in_channels,
+            num_classes=num_classes,
+            beta=beta,
+            threshold=threshold,
+            spike_grad=spike_grad,
+            stem_channels=128,
+            stage_blocks=[3, 3, 2],
+            stage_channels=[128, 256, 512],
             learn_beta=learn_beta,
             learn_threshold=learn_threshold
         )
