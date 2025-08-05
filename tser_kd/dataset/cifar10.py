@@ -21,7 +21,7 @@ def load_cifar10_data(auto_aug: bool = False, cutout: bool = False) -> tuple:
             - num_class: The number of classes.
     """
     # Number of classes
-    num_class = 10
+    num_classes = 10
 
     # Standard data augmentation for CIFAR10
     train_transform = [
@@ -54,4 +54,4 @@ def load_cifar10_data(auto_aug: bool = False, cutout: bool = False) -> tuple:
     train_dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=train_transform)
     val_dataset = datasets.CIFAR10(root='./data', train=False, download=True, transform=val_transform)
 
-    return train_dataset, val_dataset, num_class
+    return train_dataset, val_dataset, num_classes

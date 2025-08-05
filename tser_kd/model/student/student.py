@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import snntorch as snn
 from tser_kd.model import conv3x3, conv1x1
-from tser_kd.model.student import TDBatchNorm2d, LayerTWrapper, LIFTWrapper
+from tser_kd.model.student import LayerTWrapper, LIFTWrapper
 
 
 class SResNetBlock(nn.Module):
@@ -22,7 +22,17 @@ class SResNetBlock(nn.Module):
         lif3: Final LIF neuron applied after summing the residual and shortcut paths.
     """
 
-    def __init__(self, in_channels: int, out_channels: int, stride: int, beta: float) -> None:
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            stride: int,
+            beta: float,
+            threshold: float,
+            spike_grad,
+            learn_beta: bool = False,
+            learn_threshold: bool = False
+    ) -> None:
         """Initializes the SResNetBlock.
 
         Args:
@@ -36,25 +46,46 @@ class SResNetBlock(nn.Module):
         # Main branch
         self.t_conv_bn1 = LayerTWrapper(
             layer=conv3x3(in_channels=in_channels, out_channels=out_channels, stride=stride),
-            batch_norm=TDBatchNorm2d(num_features=out_channels)
+            batch_norm=nn.BatchNorm3d(num_features=out_channels)
         )
-        self.lif1 = LIFTWrapper(layer=snn.Leaky(beta=beta, init_hidden=True))
+        self.lif1 = LIFTWrapper(layer=snn.Leaky(
+            beta=beta,
+            threshold=threshold,
+            init_hidden=True,
+            learn_beta=learn_beta,
+            learn_threshold=learn_threshold,
+            spike_grad=spike_grad
+        ))
 
         self.t_conv_bn2 = LayerTWrapper(
             layer=conv3x3(in_channels=out_channels, out_channels=out_channels),
-            batch_norm=TDBatchNorm2d(num_features=out_channels, alpha=1/(2**0.5))
+            batch_norm=nn.BatchNorm3d(num_features=out_channels)
         )
-        self.lif2 = LIFTWrapper(layer=snn.Leaky(beta=beta, init_hidden=True))
+        self.lif2 = LIFTWrapper(layer=snn.Leaky(
+            beta=beta,
+            threshold=threshold,
+            init_hidden=True,
+            learn_beta=learn_beta,
+            learn_threshold=learn_threshold,
+            spike_grad=spike_grad
+        ))
 
         # Shortcut branch
         self.shortcuts = None
         if stride != 1 or in_channels != out_channels:
             self.shortcuts = LayerTWrapper(
                 layer=conv1x1(in_channels=in_channels, out_channels=out_channels, stride=stride),
-                batch_norm=TDBatchNorm2d(num_features=out_channels, alpha=1/(2**0.5))
+                batch_norm=nn.BatchNorm3d(num_features=out_channels)
             )
 
-        self.lif3 = LIFTWrapper(layer=snn.Leaky(beta=beta, init_hidden=True))
+        self.lif3 = LIFTWrapper(layer=snn.Leaky(
+            beta=beta,
+            threshold=threshold,
+            init_hidden=True,
+            learn_beta=learn_beta,
+            learn_threshold=learn_threshold,
+            spike_grad=spike_grad
+        ))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass for the basic block.
@@ -102,10 +133,13 @@ class SResNet(nn.Module):
             in_channels: int,
             num_classes: int,
             beta: float,
+            threshold: float,
+            spike_grad,
             stem_channels: int,
             stage_blocks: list[int],
             stage_channels: list[int],
-            fc_hidden_dims: list[int] | None = None
+            learn_beta: bool = False,
+            learn_threshold: bool = False,
     ) -> None:
         """Initializes the SResNet.
 
@@ -116,16 +150,29 @@ class SResNet(nn.Module):
             stem_channels: Number of channels in the stem layer.
             stage_blocks: List containing the number of basic blocks for each stage.
             stage_channels: List containing the number of channels for each stage.
-            fc_hidden_dims: List containing the number of features for each intermediate MLP layer.
         """
         super(SResNet, self).__init__()
+
+        self.beta = beta
+        self.threshold = threshold
+        self.learn_beta = learn_beta
+        self.learn_threshold = learn_threshold
+        self.spike_grad = spike_grad
 
         # Stem block
         self.stem = LayerTWrapper(
             layer=conv3x3(in_channels=in_channels, out_channels=stem_channels),
-            batch_norm=TDBatchNorm2d(num_features=stem_channels),
+            batch_norm=nn.BatchNorm3d(num_features=stem_channels),
         )
-        self.lif_stem = LIFTWrapper(layer=snn.Leaky(beta=beta, init_hidden=True))
+
+        self.lif_stem = LIFTWrapper(layer=snn.Leaky(
+            beta=beta,
+            threshold=threshold,
+            init_hidden=True,
+            learn_beta=learn_beta,
+            learn_threshold=learn_threshold,
+            spike_grad=spike_grad
+        ))
 
         # Residual blocks
         self.stages = nn.ModuleList()
@@ -135,7 +182,7 @@ class SResNet(nn.Module):
         for blocks, out_c in zip(stage_blocks, stage_channels):
             # Appends a customized stage
             self.stages.append(
-                self._make_stage(num_blocks=blocks, in_channels=in_c, out_channels=out_c, beta=beta)
+                self._make_stage(num_blocks=blocks, in_channels=in_c, out_channels=out_c)
             )
             # Updates the input channels for the next stage
             in_c = out_c
@@ -144,35 +191,15 @@ class SResNet(nn.Module):
         self.t_avg_pool = LayerTWrapper(layer=nn.AdaptiveAvgPool2d((1, 1)))
 
         # MLP head
-        # Initialization depending on if the architecture has multiple layers in the MLP or not
-        fc_hidden_dims = fc_hidden_dims or []
+        self.mlp = LayerTWrapper(layer=nn.Linear(in_features=in_c, out_features=num_classes, bias=False))
 
-        # Creates a list containing the number of features that the MLP will possess
-        # Starts with the output of the global average pooling, then adds hidden features dimension if any,
-        # then ends with the number of classes
-        dims = [stage_channels[-1], *fc_hidden_dims, num_classes]
-
-        # Creates a list containing the layers in the MLP head
-        mlp_layers = []
-        for i, (d_in, d_out) in enumerate(zip(dims[:-1], dims[1:])):
-            # Adds the customized layer into the list
-            mlp_layers.append(LayerTWrapper(layer=nn.Linear(in_features=d_in, out_features=d_out, bias=False)))
-
-            # Adds a LIF layer between the FC layers if more than one is present
-            if i < len(dims) - 2:
-                mlp_layers.append(LIFTWrapper(layer=snn.Leaky(beta=beta, init_hidden=True)))
-
-        # Creates the MLP head
-        self.mlp = nn.Sequential(*mlp_layers)
-
-    def _make_stage(self, num_blocks: int, in_channels: int, out_channels: int, beta: float) -> nn.Sequential:
+    def _make_stage(self, num_blocks: int, in_channels: int, out_channels: int) -> nn.Sequential:
         """Builds a SResNet stage with the specific configuration.
 
         Args:
             num_blocks: How many SResNet blocks to stack.
             in_channels: Number of input channels for the stage.
             out_channels: Number of output channels for the stage.
-            beta: Initial membrane-decay constant for the stage.
 
         Returns:
             A sequential container with the specified configuration.
@@ -184,9 +211,16 @@ class SResNet(nn.Module):
             stride = 2 if (block_i == 0 and in_channels != out_channels) else 1
 
             # Adds a block
-            layers.append(
-                SResNetBlock(in_channels=in_channels, out_channels=out_channels, stride=stride, beta=beta)
-            )
+            layers.append(SResNetBlock(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                stride=stride,
+                beta=self.beta,
+                threshold=self.threshold,
+                learn_beta=self.learn_beta,
+                learn_threshold=self.learn_threshold,
+                spike_grad=self.spike_grad
+            ))
 
             # Updates the input channels for the next block
             in_channels = out_channels
@@ -221,12 +255,203 @@ class SResNet(nn.Module):
         return x if self.training else x.mean(0)
 
 
+class SCNN_T(nn.Module):
+    """Spiking tiny CNN architecture.
+
+    This spiking CNN is a test architecture that is simple without residual connections and batch normalization.
+
+
+    """
+
+    def __init__(
+            self,
+            in_channels: int,
+            num_classes: int,
+            beta: float,
+            threshold: float,
+            learn_beta: bool = False,
+            learn_threshold: bool = False
+    ) -> None:
+        """Initializes the SCNN_T.
+
+        Args:
+            in_channels: Number of channels in the input frames.
+            num_classes: Number of output classes.
+            beta: Membrane-decay constant for all LIF neurons.
+            threshold: Membrane voltage threshold for all LIF neurons.
+            learn_beta: Flag that allows to learn the membrane decay for all LIF neurons.
+            learn_threshold: Flag that allows to learn the membrane voltage threshold for all LIF neurons.
+        """
+        super(SCNN_T, self).__init__()
+
+        # Stem block
+        self.stem = LayerTWrapper(layer=conv3x3(in_channels=in_channels, out_channels=64))
+        self.lif_stem = LIFTWrapper(
+            layer=snn.Leaky(beta=beta, threshold=threshold, init_hidden=True, learn_beta=learn_beta, learn_threshold=learn_threshold)
+        )
+
+        # Conv1
+        self.conv1 = LayerTWrapper(layer=conv3x3(in_channels=64, out_channels=128, stride=2))
+        self.lif1 = LIFTWrapper(
+            layer=snn.Leaky(beta=beta, threshold=threshold, init_hidden=True, learn_beta=learn_beta, learn_threshold=learn_threshold)
+        )
+
+        # Conv2
+        self.conv2 = LayerTWrapper(layer=conv3x3(in_channels=128, out_channels=256, stride=2))
+        self.lif2 = LIFTWrapper(
+            layer=snn.Leaky(beta=beta, threshold=threshold, init_hidden=True, learn_beta=learn_beta, learn_threshold=learn_threshold)
+        )
+
+        # Global pool
+        self.avg_pool = LayerTWrapper(layer=nn.AdaptiveAvgPool2d((1, 1)))
+
+        self.mlp = LayerTWrapper(layer=nn.Linear(in_features=256, out_features=num_classes, bias=False))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass.
+
+        Args:
+            x: Input tensor of shape [T, B, C, H, W].
+
+        Returns:
+            torch.Tensor: Logits for every time step if the model is in training mode, shape [T, B, K],
+                mean of logits over time steps if the model is in eval mode, shape [B, K].
+        """
+        # x.shape: [T, B, 1, 28, 28]
+
+        x = self.lif_stem(self.stem(x))
+        # x.shape: [T, B, 64, 28, 28]
+
+        x = self.lif1(self.conv1(x))
+        # x.shape: [T, B, 128, 14, 14]
+
+        x = self.lif2(self.conv2(x))
+        # x.shape: [T, B, 256, 7, 7]
+
+        # Global pool
+        x = self.avg_pool(x)
+        x = x.view(x.size(0), x.size(1), x.size(2))
+
+        # MLP
+        x = self.mlp(x)
+
+        # Regulates the output based on the model current mode
+        return x if self.training else x.mean(0)
+
+
+
+class SCNN_S(nn.Module):
+    """Spiking small CNN architecture.
+
+    This spiking CNN is a test architecture that is simple without residual connections and batch normalization.
+
+
+    """
+
+    def __init__(
+            self,
+            in_channels: int,
+            num_classes: int,
+            beta: float,
+            threshold: float,
+            learn_beta: bool = False,
+            learn_threshold: bool = False
+    ) -> None:
+        """Initializes the SCNN_S.
+
+        Args:
+            in_channels: Number of channels in the input frames.
+            num_classes: Number of output classes.
+            beta: Membrane-decay constant for all LIF neurons.
+            threshold: Membrane voltage threshold for all LIF neurons.
+            learn_beta: Flag that allows to learn the membrane decay for all LIF neurons.
+            learn_threshold: Flag that allows to learn the membrane voltage threshold for all LIF neurons.
+        """
+        super(SCNN_S, self).__init__()
+
+        # Stem block
+        self.stem = LayerTWrapper(layer=conv3x3(in_channels=in_channels, out_channels=64))
+        self.lif_stem = LIFTWrapper(
+            layer=snn.Leaky(beta=beta, threshold=threshold, init_hidden=True, learn_beta=learn_beta, learn_threshold=learn_threshold)
+        )
+
+        # Conv1
+        self.conv1 = LayerTWrapper(layer=conv3x3(in_channels=64, out_channels=64))
+        self.lif1 = LIFTWrapper(
+            layer=snn.Leaky(beta=beta, threshold=threshold, init_hidden=True, learn_beta=learn_beta, learn_threshold=learn_threshold)
+        )
+
+        # Conv2
+        self.conv2 = LayerTWrapper(layer=conv3x3(in_channels=64, out_channels=128, stride=2))
+        self.lif2 = LIFTWrapper(
+            layer=snn.Leaky(beta=beta, threshold=threshold, init_hidden=True, learn_beta=learn_beta, learn_threshold=learn_threshold)
+        )
+
+        # Conv3
+        self.conv3 = LayerTWrapper(layer=conv3x3(in_channels=128, out_channels=128))
+        self.lif3 = LIFTWrapper(
+            layer=snn.Leaky(beta=beta, threshold=threshold, init_hidden=True, learn_beta=learn_beta, learn_threshold=learn_threshold)
+        )
+
+        # Conv4
+        self.conv4 = LayerTWrapper(layer=conv3x3(in_channels=128, out_channels=256, stride=2))
+        self.lif4 = LIFTWrapper(
+            layer=snn.Leaky(beta=beta, threshold=threshold, init_hidden=True, learn_beta=learn_beta, learn_threshold=learn_threshold)
+        )
+
+        # Global pool
+        self.avg_pool = LayerTWrapper(layer=nn.AdaptiveAvgPool2d((1, 1)))
+
+        self.mlp = LayerTWrapper(layer=nn.Linear(in_features=256, out_features=num_classes, bias=False))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass.
+
+        Args:
+            x: Input tensor of shape [T, B, C, H, W].
+
+        Returns:
+            torch.Tensor: Logits for every time step if the model is in training mode, shape [T, B, K],
+                mean of logits over time steps if the model is in eval mode, shape [B, K].
+        """
+        # x.shape: [T, B, 1, 28, 28]
+
+        x = self.lif_stem(self.stem(x))
+        # x.shape: [T, B, 64, 28, 28]
+
+        x = self.lif1(self.conv1(x))
+        # x.shape: [T, B, 64, 28, 28]
+
+        x = self.lif2(self.conv2(x))
+        # x.shape: [T, B, 128, 14, 14]
+
+        x = self.lif3(self.conv3(x))
+        # x.shape: [T, B, 128, 14, 14]
+
+        x = self.lif4(self.conv4(x))
+        # x.shape: [T, B, 256, 7, 7]
+
+        # Global pool
+        x = self.avg_pool(x)
+        x = x.view(x.size(0), x.size(1), x.size(2))
+
+        # MLP
+        x = self.mlp(x)
+
+        # Regulates the output based on the model current mode
+        return x if self.training else x.mean(0)
+
+
 def make_student_model(
         arch: str,
         in_channels: int,
         num_classes: int,
         beta: float,
+        threshold: float,
+        spike_grad,
         device: torch.device,
+        learn_beta: bool = False,
+        learn_threshold: bool = False,
         state_dict: dict = None
 ) -> nn.Module:
     """Constructs and returns a Spiking student model based on the specified architecture.
@@ -235,15 +460,19 @@ def make_student_model(
     Optionally loads a pre-trained state dictionary into the model.
 
     Currently, supports:
+        - 'scnn-t': Custom test tiny spiking CNN-T.
+        - 'scnn-s': Custom test small spiking CNN-S.
         - 'sresnet-18': A custom SResNet-18 backbone for CIFAR-10.
-        - 'sresnet-19': A custom SResNet-19 backbone for CIFAR-10.
 
     Args:
         arch: Architecture name.
         in_channels: Number of input channels for the first convolutional layer.
         num_classes: Number of output classes for the final linear layer.
         beta: Initial membrane-decay constant for all LIF neurons.
+        threshold: Membrane voltage threshold for all LIF neurons.
         device: The device (CPU or GPU) to which the model will be offloaded.
+        learn_beta: Flag that allows to learn the membrane decay for all LIF neurons.
+        learn_threshold: Flag that allows to learn the membrane voltage threshold for all LIF neurons.
         state_dict: A state dictionary of pre-trained weights to load into the model.
 
     Returns:
@@ -258,9 +487,13 @@ def make_student_model(
             in_channels=in_channels,
             num_classes=num_classes,
             beta=beta,
+            threshold=threshold,
+            spike_grad=spike_grad,
             stem_channels=64,
             stage_blocks=[2, 2, 2, 2],
-            stage_channels=[64, 128, 256, 512]
+            stage_channels=[64, 128, 256, 512],
+            learn_beta=learn_beta,
+            learn_threshold=learn_threshold
         )
     elif arch == 'sresnet-19':
         # Creates the student model architecture
@@ -268,10 +501,33 @@ def make_student_model(
             in_channels=in_channels,
             num_classes=num_classes,
             beta=beta,
+            threshold=threshold,
+            spike_grad=spike_grad,
             stem_channels=128,
             stage_blocks=[3, 3, 2],
             stage_channels=[128, 256, 512],
-            fc_hidden_dims=[256]
+            learn_beta=learn_beta,
+            learn_threshold=learn_threshold
+        )
+    elif arch == 'scnn-t':
+        # Creates the student model architecture
+        student = SCNN_T(
+            in_channels=in_channels,
+            num_classes=num_classes,
+            beta=beta,
+            threshold=threshold,
+            learn_beta=learn_beta,
+            learn_threshold=learn_threshold
+        )
+    elif arch == 'scnn-s':
+        # Creates the student model architecture
+        student = SCNN_S(
+            in_channels=in_channels,
+            num_classes=num_classes,
+            beta=beta,
+            threshold=threshold,
+            learn_beta=learn_beta,
+            learn_threshold=learn_threshold
         )
 
     # Checks if a parameter configuration must be loaded
