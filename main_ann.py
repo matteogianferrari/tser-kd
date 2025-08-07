@@ -8,7 +8,7 @@ from tser_kd.dataset import load_cifar10_data, load_mnist_data
 from tser_kd.model.teacher import make_teacher_model
 from tser_kd.eval import run_eval
 from tser_kd.training import run_train
-from config import args
+from config import args, args_dict
 
 
 # Setups the seed for reproducibility
@@ -82,7 +82,7 @@ if __name__ == '__main__':
     acc_monitor = AccuracyMonitor(path=args.model_path)
 
     # Initializes wandb
-    run = initialize_wandb(args)
+    run = initialize_wandb(args_dict)
 
     # Training
     epoch_i = 0

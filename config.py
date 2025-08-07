@@ -34,3 +34,4 @@ parser.add_argument('--epochs', default=300, type=int, help='Training epochs.')
 parser.add_argument('--model_path', default='ckpt/best_acc.pth', type=str, help='Path to save the best model weights.')
 
 args = parser.parse_args()
+args_dict = vars(args)
