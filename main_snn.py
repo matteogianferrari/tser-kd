@@ -3,12 +3,15 @@ from torch.utils.data import DataLoader
 import torch.optim as optim
 import torch.nn as nn
 import wandb
+import snntorch as snn
+from snntorch import surrogate
 from tser_kd.utils import setup_seed, AccuracyMonitor
-from tser_kd.dataset import load_cifar10_data, load_mnist_data
-from tser_kd.model.teacher import make_teacher_model
+from tser_kd.dataset import load_cifar10_data, load_mnist_data, StaticEncoder
+from tser_kd.model.student import make_student_model
+from tser_kd.model import TSCELoss
 from tser_kd.eval import run_eval
 from tser_kd.training import run_train
-from config_ann import args, args_dict
+from config_snn import args, args_dict
 
 
 # Setups the seed for reproducibility
@@ -26,7 +29,7 @@ def initialize_wandb(config: dict):
     # Name the run using current time and configuration name
     run_complete_name = f"{time.strftime('%Y%m%d%H%M%S')}-{args.run_name}"
 
-    return wandb.init(project="tser-kd", name=run_complete_name, config=dict(config), group='teacher')
+    return wandb.init(project="tser-kd", name=run_complete_name, config=dict(config), group='student')
 
 
 if __name__ == '__main__':
@@ -45,26 +48,35 @@ if __name__ == '__main__':
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
 
-    # Check if an existing state_dict must be loaded
-    t_state_dict = None
+    # Selects the surrogate gradient
+    if args.snn_grad == 'atan':
+        spike_grad = surrogate.atan()
 
-    if args.t_weight is not None:
-        t_state_dict = torch.load(args.t_weight, map_location="cpu")
+    # Check if an existing state_dict must be loaded
+    s_state_dict = None
+
+    if args.s_weight is not None:
+        s_state_dict = torch.load(args.s_weight, map_location="cpu")
 
     # Creates the model architecture
-    t_model = make_teacher_model(
-        arch=args.teacher_arch,
+    s_model = make_student_model(
+        arch=args.student_arch,
         in_channels=in_channels,
         num_classes=num_classes,
+        beta=args.beta,
+        threshold=args.v_th,
+        spike_grad=spike_grad,
         device=device,
-        state_dict=t_state_dict
+        learn_beta=args.learn_beta,
+        learn_threshold=args.learn_threshold,
+        state_dict=s_state_dict
     )
 
     # Creates the optimizer
     if args.optimizer == 'adamw':
-        opt = optim.AdamW(t_model.parameters(), lr=args.lr, weight_decay=args.wd)
+        opt = optim.AdamW(s_model.parameters(), lr=args.lr, weight_decay=args.wd)
     elif args.optimizer == 'sgd':
-        opt = optim.SGD(t_model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.wd)
+        opt = optim.SGD(s_model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.wd)
 
     # Creates the scheduler
     if args.scheduler == 'reduce':
@@ -73,7 +85,11 @@ if __name__ == '__main__':
         scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs)
 
     # Creates the loss function
-    criterion = nn.CrossEntropyLoss()
+    train_criterion = TSCELoss()
+    eval_criterion = nn.CrossEntropyLoss()
+
+    # Creates the encoder
+    encoder = StaticEncoder(num_steps=args.t_steps)
 
     # Crates the scaler
     scaler = torch.amp.GradScaler(device='cuda')
@@ -91,10 +107,10 @@ if __name__ == '__main__':
     for epoch_i in range(args.epochs):
         # Forward pass
         train_loss, train_acc, epoch_time, train_batch_time = run_train(
-            epoch_i, train_loader, t_model, criterion, opt, device, scaler
+            epoch_i, train_loader, s_model, train_criterion, opt, device, scaler, encoder
         )
 
-        val_loss, val_acc1, val_acc5, val_batch_time = run_eval(val_loader, t_model, criterion, device)
+        val_loss, val_acc1, val_acc5, val_batch_time = run_eval(val_loader, s_model, eval_criterion, device, encoder)
 
         # Updates the LR
         if args.scheduler == 'reduce':
@@ -118,6 +134,6 @@ if __name__ == '__main__':
         })
 
         # Accuracy monitor
-        acc_monitor(val_acc1, epoch_i, t_model)
+        acc_monitor(val_acc1, epoch_i, s_model)
 
     run.finish()

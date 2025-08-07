@@ -31,7 +31,7 @@ parser.add_argument('--epochs', default=300, type=int, help='Training epochs.')
 # parser.add_argument('--alpha', default=1e-2, type=float, help='KL and CE weighting parameter in KD.')
 # parser.add_argument('--gamma', default=1e-3, type=float, help='ER weighting parameter in KD.')
 # parser.add_argument('--tau', default=5, type=float, help='Temperature.')
-parser.add_argument('--model_path', default='ckpt/best_acc.pth', type=str, help='Path to save the best model weights.')
+parser.add_argument('--model_path', default='data/teacher_models/best_acc.pth', type=str, help='Path to save the best model weights.')
 
 args = parser.parse_args()
 args_dict = vars(args)
