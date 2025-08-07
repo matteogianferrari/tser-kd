@@ -1,0 +1,33 @@
+import os
+import argparse
+
+parser = argparse.ArgumentParser(description="TSER-KD")
+
+parser.add_argument('--dev_name', default='cuda', type=str, help='Device to offload the model.')
+parser.add_argument('--dataset', default='cifar10', type=str, help='Dataset used to train the model.\nPossible candidates are [cifar10, mnist].')
+parser.add_argument('--auto_aug', default=True, type=bool, help='Applies AutoAugmentation on the dataset.\nValid only on cifar10.')
+parser.add_argument('--cutout', default=True, type=bool, help='Applies CutOut on the dataset.\nValid only on cifar10.')
+parser.add_argument('--batch_size', default=32, type=int, help='Batch size for the dataset.')
+parser.add_argument('--num_workers', default=2, type=int, help='Number of threads used by the data loaders.')
+parser.add_argument('--experiment_type', default='kd', type=str, help='Type of training to perform.\nPossible experiments are: [ann, snn, kd].')
+parser.add_argument('--t_weight', default=None, type=str, help='State dict path for the teacher model.')
+parser.add_argument('--teacher_arch', default='resnet-34', type=str, help='Teacher model architecture.\nPossible models are: [resnet-34, resnet-19, resnet-18].')
+parser.add_argument('--snn_grad', default='atan', type=str, help='Student surrogate gradient.')
+parser.add_argument('--s_weight', default=None, type=str, help='State dict path for the student model.')
+parser.add_argument('--student_arch', default='resnet-18', type=str, help='Student model architecture.\nPossible models are: [sresnet-19, sresnet-18, scnn-t, scnn-s].')
+parser.add_argument('--beta', default=0.5, type=float, help='Membrane decaying parameter for LIF neurons.')
+parser.add_argument('--v_th', default=1.0, type=float, help='Membrane threshold for LIF neurons.')
+parser.add_argument('--learn_beta', default=False, type=bool, help='Allows learnable membrane decaying parameters for LIF neurons.')
+parser.add_argument('--learn_threshold', default=False, type=bool, help='Allows learnable membrane threshold parameters for LIF neurons.')
+parser.add_argument('--optimizer', default='adamw', type=str, help='Optimizer for training the model.\nPossible optimizers are: [adamw, sgd].')
+parser.add_argument('--lr', default=3e-3, type=float, help='Learning rate.')
+parser.add_argument('--wd', default=5e-4, type=float, help='Weight decay for optimizer.')
+parser.add_argument('--momentum', default=0.9, type=float, help='Momentum for optimizer.')
+parser.add_argument('--scheduler', default='cosine', type=str, help='Learning rate scheduler for training.\nPossible schedulers are: [cosine, reduce].')
+parser.add_argument('--lr', default=3e-3, type=float, help='Learning rate.')
+parser.add_argument('--lr', default=3e-3, type=float, help='Learning rate.')
+parser.add_argument('--lr', default=3e-3, type=float, help='Learning rate.')
+parser.add_argument('--lr', default=3e-3, type=float, help='Learning rate.')
+parser.add_argument('--lr', default=3e-3, type=float, help='Learning rate.')
+
+args = parser.parse_args()
