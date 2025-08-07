@@ -3,7 +3,6 @@ import argparse
 
 parser = argparse.ArgumentParser(description="TSER-KD")
 
-parser.add_argument('--dev_name', default='cuda', type=str, help='Device to offload the model.')
 parser.add_argument('--dataset', default='cifar10', type=str, help='Dataset used to train the model.\nPossible candidates are [cifar10, mnist].')
 parser.add_argument('--auto_aug', default=True, type=bool, help='Applies AutoAugmentation on the dataset.\nValid only on cifar10.')
 parser.add_argument('--cutout', default=True, type=bool, help='Applies CutOut on the dataset.\nValid only on cifar10.')

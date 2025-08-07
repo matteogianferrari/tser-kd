@@ -20,7 +20,7 @@ setup_seed(42)
 
 if __name__ == '__main__':
     # Selects the device for the experiment
-    device = torch.device(args.dev_name if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Dataset creation
     if args.dataset == 'cifar10':
