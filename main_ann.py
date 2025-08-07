@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 import torch.optim as optim
 import torch.nn as nn
+import wandb
 from tser_kd.utils import setup_seed, AccuracyMonitor
 from tser_kd.dataset import load_cifar10_data, load_mnist_data
 from tser_kd.model.teacher import make_teacher_model
@@ -12,6 +13,20 @@ from config import args
 
 # Setups the seed for reproducibility
 setup_seed(42)
+
+
+def initialize_wandb(config: dict):
+    import time
+    """
+    Initializes Weights and Biases (wandb) with the given configuration.
+
+    Args:
+        configuration: Configuration parameters for the run.
+    """
+    # Name the run using current time and configuration name
+    run_complete_name = f"{time.strftime('%Y%m%d%H%M%S')}-{args.run_name}"
+
+    return wandb.init(project="tser-kd", name=run_complete_name, config=dict(config), group='teacher')
 
 
 if __name__ == '__main__':
@@ -67,6 +82,9 @@ if __name__ == '__main__':
     # Accuracy monitor
     acc_monitor = AccuracyMonitor(path=args.model_path)
 
+    # Initializes wandb
+    run = initialize_wandb(args)
+
     # Training
     epoch_i = 0
     curr_lr = opt.param_groups[0]["lr"]
@@ -79,12 +97,6 @@ if __name__ == '__main__':
 
         val_loss, val_acc1, val_acc5, val_batch_time = run_eval(val_loader, t_model, criterion, device)
 
-        # Logging
-        print(
-            f"Time: {epoch_time:.1f}s | Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | "
-            f"Val Loss: {val_loss:.4f} | Val Acc1: {val_acc1:.2f}% | Val Acc5: {val_acc5:.2f}% | LR: {curr_lr:.6f}"
-        )
-
         # Updates the LR
         if args.scheduler == 'reduce':
             scheduler.step(val_loss)
@@ -93,5 +105,19 @@ if __name__ == '__main__':
 
         curr_lr = opt.param_groups[0]["lr"]
 
+        # Logging
+        print(
+            f"Time: {epoch_time:.1f}s | Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | "
+            f"Val Loss: {val_loss:.4f} | Val Acc1: {val_acc1:.2f}% | Val Acc5: {val_acc5:.2f}% | LR: {curr_lr:.6f}"
+        )
+
+        run.log({
+            "Train Loss": train_loss, "Train Accuracy": train_acc,
+            "Validation Loss": val_loss, "Validation Accuracy 1": val_acc1, "Validation Accuracy 5": val_acc5,
+            "Epoch Time": epoch_time, "Learning Rate": curr_lr
+        })
+
         # Accuracy monitor
         acc_monitor(val_acc1, epoch_i, t_model)
+
+    run.finish()
