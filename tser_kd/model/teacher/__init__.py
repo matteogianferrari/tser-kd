@@ -5,12 +5,12 @@ Modules:
         a teacher model based on the specified architecture.
 """
 
-from .teacher import make_teacher_model
 from .resnet import ResNetBlock, ResNet19
+from .teacher import make_teacher_model
 
 
 __all__ = [
-    "make_teacher_model",
     "ResNetBlock",
     "ResNet19",
+    "make_teacher_model",
 ]
