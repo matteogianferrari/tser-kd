@@ -1,0 +1,6 @@
+torchvision==0.22.1
+pytorch==2.7.1
+snntorch==0.9.4
+tqdm==4.67.1
+matplotlib==3.10.5
+ipython==0.4.0

@@ -93,9 +93,9 @@ if __name__ == '__main__':
 
     # Creates the scheduler
     if args.scheduler == 'reduce':
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=lr_patience, factor=lr_factor)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(opt, patience=args.lr_patience, factor=args.lr_factor)
     elif args.scheduler == 'cosine':
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs)
 
     # Creates the loss
     if args.experiment_type == 'ann':
@@ -104,28 +104,25 @@ if __name__ == '__main__':
         train_criterion = TSCELoss()
         eval_criterion = nn.CrossEntropyLoss()
     elif args.experiment_type == 'kd':
-        train_criterion = TSERKDLoss(alpha=alpha, gamma=gamma, tau=tau)
+        train_criterion = TSERKDLoss(alpha=args.alpha, gamma=args.gamma, tau=args.tau)
         eval_criterion = nn.CrossEntropyLoss()
 
     # Crates the scaler
     scaler = torch.amp.GradScaler(device='cuda')
 
     # Creates the encoder
-    encoder = StaticEncoder(num_steps=t_steps)
+    encoder = StaticEncoder(num_steps=args.t_steps)
 
     # Accuracy monitor
-    acc_monitor = AccuracyMonitor(path="best_acc.pth")
-
-    # Early stopping
-    es_callback = EarlyStopping(patience=es_patience, delta=es_delta, path="best_loss.pth")
+    acc_monitor = AccuracyMonitor(path=args.model_path)
 
     # Training
     epoch_i = 0
     curr_lr = opt.param_groups[0]["lr"]
 
-    for epoch_i in range(epochs):
+    for epoch_i in range(args.epochs):
         # Forward pass
-        if experiment_type == 'ann':
+        if args.experiment_type == 'ann':
             train_loss, train_acc, epoch_time, train_batch_time = run_train(
                 epoch_i, train_loader, t_model, criterion, opt, device, scaler
             )
@@ -137,7 +134,7 @@ if __name__ == '__main__':
                 f"Time: {epoch_time:.1f}s | Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | "
                 f"Val Loss: {val_loss:.4f} | Val Acc1: {val_acc1:.2f}% | Val Acc5: {val_acc5:.2f}% | LR: {curr_lr:.6f}"
             )
-        elif experiment_type == 'snn':
+        elif args.experiment_type == 'snn':
             train_loss, train_acc, epoch_time, train_batch_time = run_train(
                 epoch_i, train_loader, s_model, train_criterion, opt, device, scaler, encoder
             )
@@ -149,7 +146,7 @@ if __name__ == '__main__':
                 f"Time: {epoch_time:.1f}s | Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | "
                 f"Val Loss: {val_loss:.4f} | Val Acc1: {val_acc1:.2f}% | Val Acc5: {val_acc5:.2f}% | LR: {curr_lr:.6f}"
             )
-        elif experiment_type == 'kd':
+        elif args.experiment_type == 'kd':
             train_total_loss, train_ce_loss, train_kl_loss, train_e_reg, train_acc, epoch_time, train_batch_time = run_kd_train(
                 epoch_i, train_loader, s_model, t_model, train_criterion, opt, device, scaler, encoder
             )
@@ -169,16 +166,12 @@ if __name__ == '__main__':
 
         curr_lr = opt.param_groups[0]["lr"]
 
-        if experiment_type == 'ann':
+        if args.experiment_type == 'ann':
             # Sets a reference to the teacher model for the optimizer during training
             model_ref = t_model
-        elif experiment_type == 'snn' or experiment_type == 'kd':
+        elif args.experiment_type == 'snn' or args.experiment_type == 'kd':
             # Sets a reference to the teacher model for the optimizer during training
             model_ref = s_model
 
         # Accuracy monitor
         acc_monitor(val_acc1, epoch_i, model_ref)
-
-        # ES check
-        if es_callback(val_loss, epoch_i, model_ref):
-            break
