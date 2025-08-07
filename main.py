@@ -10,7 +10,7 @@ from tser_kd.model.student import make_student_model
 from tser_kd.model import TSERKDLoss, TSCELoss
 from tser_kd.dataset import StaticEncoder
 from tser_kd.eval import run_eval
-from tser_kd.training import run_train, run_kd_train, EarlyStopping
+from tser_kd.training import run_train, run_kd_train
 from config import args
 
 
