@@ -72,9 +72,8 @@ if __name__ == '__main__':
     elif args.scheduler == 'cosine':
         scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs)
 
-    # Creates the loss
-    if args.experiment_type == 'ann':
-        criterion = nn.CrossEntropyLoss()
+    # Creates the loss function
+    criterion = nn.CrossEntropyLoss()
 
     # Crates the scaler
     scaler = torch.amp.GradScaler(device='cuda')
