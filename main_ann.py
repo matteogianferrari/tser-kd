@@ -114,7 +114,8 @@ if __name__ == '__main__':
         run.log({
             "Train Loss": train_loss, "Train Accuracy": train_acc,
             "Validation Loss": val_loss, "Validation Accuracy 1": val_acc1, "Validation Accuracy 5": val_acc5,
-            "Epoch Time": epoch_time, "Learning Rate": curr_lr
+            "Epoch Time": epoch_time, "Learning Rate": curr_lr,
+            "Train Batch Time": train_batch_time, "Validation Batch Time": val_batch_time
         })
 
         # Accuracy monitor
