@@ -8,6 +8,8 @@ from snntorch import surrogate
 from tser_kd.utils import setup_seed, AccuracyMonitor
 from tser_kd.dataset import load_cifar10_data, load_mnist_data, StaticEncoder
 from tser_kd.model.student import make_student_model
+from tser_kd.model.teacher import make_teacher_model
+from tser_kd.model import transfer_weights_resnet18_sresnet18
 from tser_kd.model import TSCELoss
 from tser_kd.eval import run_eval
 from tser_kd.training import run_train
@@ -71,6 +73,27 @@ if __name__ == '__main__':
         learn_threshold=args.learn_threshold,
         state_dict=s_state_dict
     )
+
+    # Checks if transfer learning from another model
+    if args.transfer:
+        # Loads the state dict of the trained model
+        transfer_state_dict = torch.load(args.transfer_weight, map_location="cpu")
+
+        # Creates the model to perform transfer
+        transfer_model = make_teacher_model(
+            arch=args.transfer_arch,
+            in_channels=in_channels,
+            num_classes=num_classes,
+            device=device,
+            state_dict=transfer_state_dict
+        )
+
+        # TEMP ONLY THIS TRANSFER AT THE MOMENT
+        # Performs transfer learning
+        transfer_weights_resnet18_sresnet18(r18=transfer_model, sr18=s_model, trainable=args.trainable_weights)
+
+        # Remove the model and its weights
+        del transfer_model, transfer_state_dict
 
     # Creates the optimizer
     if args.optimizer == 'adamw':
@@ -142,9 +165,3 @@ if __name__ == '__main__':
 
     # Ends the run
     run.finish()
-
-
-# TODO: ResNet19 initialized with ResNet18 ImageNet
-# TODO: SResNet18 initialized with ResNet18 CIFAR-10 (all time steps)
-# TODO: SResNet18 initialized with ResNet18 ImageNet (all time steps)
-# TODO: SResNet19 initialized with ResNet19 CIFAR-10 (all time steps)
