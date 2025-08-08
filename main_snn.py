@@ -142,3 +142,9 @@ if __name__ == '__main__':
 
     # Ends the run
     run.finish()
+
+
+# TODO: ResNet19 initialized with ResNet18 ImageNet
+# TODO: SResNet18 initialized with ResNet18 CIFAR-10 (all time steps)
+# TODO: SResNet18 initialized with ResNet18 ImageNet (all time steps)
+# TODO: SResNet19 initialized with ResNet19 CIFAR-10 (all time steps)

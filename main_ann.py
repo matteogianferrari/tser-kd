@@ -78,6 +78,9 @@ if __name__ == '__main__':
         # Performs transfer learning
         transfer_weights_resnet18_resnet19(r18=r18_model, r19=t_model, trainable=args.trainable_weights)
 
+        # Remove the model and its weights
+        del r18_model, transfer_state_dict
+
     # Creates the optimizer
     if args.optimizer == 'adamw':
         opt = optim.AdamW(t_model.parameters(), lr=args.lr, weight_decay=args.wd)
