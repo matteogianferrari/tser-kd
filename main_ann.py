@@ -6,6 +6,7 @@ import wandb
 from tser_kd.utils import setup_seed, AccuracyMonitor
 from tser_kd.dataset import load_cifar10_data, load_mnist_data
 from tser_kd.model.teacher import make_teacher_model
+from tser_kd.model import transfer_weights_resnet18_resnet19
 from tser_kd.eval import run_eval
 from tser_kd.training import run_train
 from config_ann import args, args_dict
@@ -59,6 +60,23 @@ if __name__ == '__main__':
         device=device,
         state_dict=t_state_dict
     )
+
+    # Checks if transfer learning from another model
+    if args.transfer and args.teacher_arch == 'resnet-19':
+        # Loads the state dict of the trained model
+        transfer_state_dict = torch.load(args.transfer_weight, map_location="cpu")
+
+        # Creates the model to perform transfer
+        r18_model = make_teacher_model(
+            arch='resnet-18',
+            in_channels=in_channels,
+            num_classes=num_classes,
+            device=device,
+            state_dict=transfer_state_dict
+        )
+
+        # Performs transfer learning
+        transfer_weights_resnet18_resnet19(r18=r18_model, r19=t_model, trainable=args.trainable_weights)
 
     # Creates the optimizer
     if args.optimizer == 'adamw':
