@@ -136,4 +136,9 @@ if __name__ == '__main__':
         # Accuracy monitor
         acc_monitor(val_acc1, epoch_i, s_model)
 
+    s_model.load_state_dict(torch.load(args.model_path))
+    test_ce_loss, test_acc1, test_acc5, _ = run_eval(val_loader, s_model, eval_criterion, device, encoder)
+    run.log({"Test CE Loss": test_ce_loss, "Test Accuracy 1": test_acc1, "Test Accuracy 5": test_acc5})
+
+    # Ends the run
     run.finish()
