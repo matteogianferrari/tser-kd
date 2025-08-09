@@ -111,9 +111,9 @@ if __name__ == '__main__':
 
     # Creates the optimizer
     if args.optimizer == 'adamw':
-        opt = optim.AdamW(t_model.parameters(), lr=args.lr, weight_decay=args.wd)
+        opt = optim.AdamW(s_model.parameters(), lr=args.lr, weight_decay=args.wd)
     elif args.optimizer == 'sgd':
-        opt = optim.SGD(t_model.parameters(), lr=args.lr, momentum=momentum, weight_decay=args.wd)
+        opt = optim.SGD(s_model.parameters(), lr=args.lr, momentum=momentum, weight_decay=args.wd)
 
     # Creates the scheduler
     if args.scheduler == 'reduce':
