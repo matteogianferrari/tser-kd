@@ -15,7 +15,7 @@ parser.add_argument('--student_arch', default='sresnet-18', type=str, help='Stud
 parser.add_argument('--transfer', default=False, type=bool, help='Flag that handles the transfer learning.')
 parser.add_argument('--transfer_weight', default=None, type=str, help='State dict path for transfer learning.')
 parser.add_argument('--trainable_weights', default=True, type=bool, help='Flag that handles the trainable weights that are transferred.')
-parser.add_argument('--transfer_arch', default='resnet-18', type=str, help='Model used to perform transfer learning.')
+parser.add_argument('--transfer_arch', default=None, type=str, help='Model used to perform transfer learning.\nPossible models are: [resnet-18, resnet-19].')
 parser.add_argument('--beta', default=0.5, type=float, help='Membrane decaying parameter for LIF neurons.')
 parser.add_argument('--v_th', default=1.0, type=float, help='Membrane threshold for LIF neurons.')
 parser.add_argument('--learn_beta', default=False, type=bool, help='Allows learnable membrane decaying parameters for LIF neurons.')

@@ -180,3 +180,93 @@ def transfer_weights_resnet18_resnet19(r18: nn.Module, r19: nn.Module, trainable
         print("[transfer] Successfully transferred all weights.")
 
     return
+
+
+def transfer_weights_resnet19_sresnet19(r19: nn.Module, sr19: nn.Module, trainable: bool = True) -> None:
+    """Transfers the learned weights from ResNet19 to SResNet19.
+
+    Batch norm parameters are excluded. Biases are disabled by architecture design.
+
+    Args:
+        r19: The trained ResNet19 model.
+        sr19: The new SResNet19 model.
+        trainable: Flag that allows the weights to be learnable, False freezes the weights.
+    """
+    # ResNet19 mapping
+    r19_dict = {
+        "conv1": r19.stem[0].weight,
+        "layer1.0.conv1": r19.block1[0].conv1.weight,
+        "layer1.0.conv2": r19.block1[0].conv2.weight,
+        "layer1.1.conv1": r19.block1[1].conv1.weight,
+        "layer1.1.conv2": r19.block1[1].conv2.weight,
+        "layer1.2.conv1": r19.block1[2].conv1.weight,
+        "layer1.2.conv2": r19.block1[2].conv2.weight,
+        "layer2.0.conv1": r19.block2[0].conv1.weight,
+        "layer2.0.conv2": r19.block2[0].conv2.weight,
+        "layer2.0.downsample.0": r19.block2[0].shortcuts[0].weight,
+        "layer2.1.conv1": r19.block2[1].conv1.weight,
+        "layer2.1.conv2": r19.block2[1].conv2.weight,
+        "layer2.2.conv1": r19.block2[2].conv1.weight,
+        "layer2.2.conv2": r19.block2[2].conv2.weight,
+        "layer3.0.conv1": r19.block3[0].conv1.weight,
+        "layer3.0.conv2": r19.block3[0].conv2.weight,
+        "layer3.0.downsample.0": r19.block3[0].shortcuts[0].weight,
+        "layer3.1.conv1": r19.block3[1].conv1.weight,
+        "layer3.1.conv2": r19.block3[1].conv2.weight,
+        "fc": r19.mlp.weight
+    }
+
+    # SResNet19 mapping
+    sr19_dict = {
+        "conv1": sr19.stem.layer.weight,
+        "layer1.0.conv1": sr19.stages[0][0].t_conv_bn1.layer.weight,
+        "layer1.0.conv2": sr19.stages[0][0].t_conv_bn2.layer.weight,
+        "layer1.1.conv1": sr19.stages[0][1].t_conv_bn1.layer.weight,
+        "layer1.1.conv2": sr19.stages[0][1].t_conv_bn2.layer.weight,
+        "layer1.2.conv1": sr19.stages[0][2].t_conv_bn1.layer.weight,
+        "layer1.2.conv2": sr19.stages[0][2].t_conv_bn2.layer.weight,
+        "layer2.0.conv1": sr19.stages[1][0].t_conv_bn1.layer.weight,
+        "layer2.0.conv2": sr19.stages[1][0].t_conv_bn2.layer.weight,
+        "layer2.0.downsample.0": sr19.stages[1][0].shortcuts.layer.weight,
+        "layer2.1.conv1": sr19.stages[1][1].t_conv_bn1.layer.weight,
+        "layer2.1.conv2": sr19.stages[1][1].t_conv_bn2.layer.weight,
+        "layer2.2.conv1": sr19.stages[1][2].t_conv_bn1.layer.weight,
+        "layer2.2.conv2": sr19.stages[1][2].t_conv_bn2.layer.weight,
+        "layer3.0.conv1": sr19.stages[2][0].t_conv_bn1.layer.weight,
+        "layer3.0.conv2": sr19.stages[2][0].t_conv_bn2.layer.weight,
+        "layer3.0.downsample.0": sr19.stages[2][0].shortcuts.layer.weight,
+        "layer3.1.conv1": sr19.stages[2][1].t_conv_bn1.layer.weight,
+        "layer3.1.conv2": sr19.stages[2][1].t_conv_bn2.layer.weight,
+        "fc": sr19.mlp.layer.weight
+    }
+
+    # Checks for mismatches
+    common_keys = r19_dict.keys() & sr19_dict.keys()
+    if not common_keys:
+        raise ValueError("No overlapping layer names between the supplied dictionaries.")
+
+    with torch.no_grad():
+        for k in common_keys:
+            src, dst = r19_dict[k], sr19_dict[k]
+
+            if src.shape != dst.shape:
+                raise ValueError(f"Shape mismatch on layer '{k}': {src.shape} vs {dst.shape}")
+
+            # Copy the weights and set the trainable flag
+            dst.copy_(src)
+            dst.requires_grad = trainable
+
+    # Warns about any entries that were not transferred
+    missing_ann = r19_dict.keys() - sr19_dict.keys()
+    missing_snn = sr19_dict.keys() - r19_dict.keys()
+    if missing_ann:
+        print(f"[transfer] ANN layers not present in SNN mapping and therefore "
+              f"not copied: {sorted(missing_ann)}")
+    if missing_snn:
+        print(f"[transfer] SNN layers not initialised (no source weights): "
+              f"{sorted(missing_snn)}")
+
+    if not missing_ann and not missing_snn:
+        print("[transfer] Successfully transferred all weights.")
+
+    return

@@ -9,7 +9,7 @@ from tser_kd.utils import setup_seed, AccuracyMonitor
 from tser_kd.dataset import load_cifar10_data, load_mnist_data, StaticEncoder
 from tser_kd.model.student import make_student_model
 from tser_kd.model.teacher import make_teacher_model
-from tser_kd.model import transfer_weights_resnet18_sresnet18
+from tser_kd.model import transfer_weights_resnet18_sresnet18, transfer_weights_resnet19_sresnet19
 from tser_kd.model import TSCELoss
 from tser_kd.eval import run_eval
 from tser_kd.training import run_train
@@ -88,9 +88,11 @@ if __name__ == '__main__':
             state_dict=transfer_state_dict
         )
 
-        # TEMP ONLY THIS TRANSFER AT THE MOMENT
         # Performs transfer learning
-        transfer_weights_resnet18_sresnet18(r18=transfer_model, sr18=s_model, trainable=args.trainable_weights)
+        if args.transfer_arch == 'resnet-18' and args.student_arch == 'sresnet-18':
+            transfer_weights_resnet18_sresnet18(r18=transfer_model, sr18=s_model, trainable=args.trainable_weights)
+        elif args.transfer_arch == 'resnet-19' and args.student_arch == 'sresnet-19':
+            transfer_weights_resnet19_sresnet19(r19=transfer_model, sr19=s_model, trainable=args.trainable_weights)
 
         # Remove the model and its weights
         del transfer_model, transfer_state_dict
