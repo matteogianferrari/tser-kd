@@ -149,11 +149,6 @@ if __name__ == '__main__':
 
         val_loss, val_acc1, val_acc5, val_batch_time = run_eval(val_loader, s_model, eval_criterion, device, encoder)
 
-        print(
-            f"Time: {epoch_time:.1f}s | Train Total Loss: {train_total_loss:.4f} | Train Acc: {train_acc:.2f}% | "
-            f"Val Loss: {val_loss:.4f} | Val Acc1: {val_acc1:.2f}% | Val Acc5: {val_acc5:.2f}% | LR: {curr_lr:.6f}"
-        )
-
         # Updates the LR
         if scheduler == 'reduce':
             scheduler.step(val_loss)
