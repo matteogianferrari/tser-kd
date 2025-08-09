@@ -221,9 +221,6 @@ def run_kd_train(
             # Scales AMP loss and apply backprop
             scaler.scale(total_val).backward()
 
-            #
-            torch.nn.utils.clip_grad_norm_(s_model.parameters(), max_norm=2.0)
-
             # optimizer.step() is called automatically
             scaler.step(optimizer)
 
