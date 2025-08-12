@@ -31,7 +31,7 @@ def initialize_wandb(config: dict):
     # Name the run using current time and configuration name
     run_complete_name = f"{time.strftime('%Y%m%d%H%M%S')}-{args.run_name}"
 
-    return wandb.init(project="tser-kd", name=run_complete_name, config=dict(config), group='student')
+    return wandb.init(project="tser-kd", name=run_complete_name, config=dict(config), group=args.group_name)
 
 
 if __name__ == '__main__':

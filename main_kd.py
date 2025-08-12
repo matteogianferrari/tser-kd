@@ -31,7 +31,7 @@ def initialize_wandb(config: dict):
     # Name the run using current time and configuration name
     run_complete_name = f"{time.strftime('%Y%m%d%H%M%S')}-{args.run_name}"
 
-    return wandb.init(project="tser-kd", name=run_complete_name, config=dict(config), group='kd')
+    return wandb.init(project="tser-kd", name=run_complete_name, config=dict(config), group=args.group_name)
 
 
 if __name__ == '__main__':
@@ -180,3 +180,30 @@ if __name__ == '__main__':
 
     # Ends the run
     run.finish()
+
+# QUEUE (PREVIOUS RUN TIME LIMIT DUE TO QUADRO RTX6000 instead of A5000)
+# TODO: SResNet19 fine-tuning with (SResNet19 CIFAR10 t=4) t=2 with ResNet34 teacher
+# TODO: SResNet19 fine-tuning with (SResNet19 CIFAR10 t=4) t=4 with ResNet34 teacher
+# TODO: SResNet19 from scratch t=4 with ResNet19 teacher
+
+
+# FROM SCRATCH
+
+
+# TRANSFER
+
+
+# FINE TUNING
+# TODO: SResNet18 fine-tuning with (SResNet18 CIFAR10 t=4) t=1 with ResNet19 teacher
+# TODO: SResNet18 fine-tuning with (SResNet18 CIFAR10 t=4) t=2 with ResNet19 teacher
+# TODO: SResNet18 fine-tuning with (SResNet18 CIFAR10 t=4) t=4 with ResNet19 teacher
+
+# TODO: SResNet19 fine-tuning with (SResNet19 CIFAR10 t=4) t=1 with ResNet19 teacher
+# TODO: SResNet19 fine-tuning with (SResNet19 CIFAR10 t=4) t=2 with ResNet19 teacher
+# TODO: SResNet19 fine-tuning with (SResNet19 CIFAR10 t=4) t=4 with ResNet19 teacher
+
+
+# STRANGE
+# TODO: ResNet19 transfer with ResNet18 ImageNet
+# TODO: SResNet18 transfer with ResNet18 ImageNet (all time steps)
+# TODO: KD grid search between ALPHA GAMMA TAU (seems like 0.024 is better than 1e-2)
